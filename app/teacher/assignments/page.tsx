@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type {
   Assignment,
   AssignmentType,
+  Attempt,
   ClassRecord,
   Profile,
 } from "@/types/database";
@@ -26,10 +27,7 @@ const assignmentTypes: {
   },
 ];
 
-const modesByType: Record<
-  AssignmentType,
-  { value: string; label: string }[]
-> = {
+const modesByType: Record<AssignmentType, { value: string; label: string }[]> = {
   ear_training: [
     { value: "interval", label: "Intervals" },
     { value: "chord", label: "Chords" },
@@ -49,12 +47,22 @@ type AssignmentWithClass = Assignment & {
   classes?: ClassRecord | ClassRecord[] | null;
 };
 
+type RosterResult = {
+  student: Profile;
+  attempt: Attempt | null;
+};
+
 export default function TeacherAssignmentsPage() {
   const supabase = createClient();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [assignments, setAssignments] = useState<AssignmentWithClass[]>([]);
+
+  const [selectedAssignment, setSelectedAssignment] =
+    useState<AssignmentWithClass | null>(null);
+  const [rosterResults, setRosterResults] = useState<RosterResult[]>([]);
+  const [loadingResults, setLoadingResults] = useState(false);
 
   const [classId, setClassId] = useState("");
   const [title, setTitle] = useState("");
@@ -90,6 +98,19 @@ export default function TeacherAssignmentsPage() {
       modesByType[type].find((item) => item.value === assignmentMode)?.label ??
       assignmentMode
     );
+  }
+
+  function getAverageScore(results: RosterResult[]) {
+    const completed = results.filter((result) => result.attempt);
+
+    if (completed.length === 0) return null;
+
+    const total = completed.reduce(
+      (sum, result) => sum + Number(result.attempt?.score ?? 0),
+      0
+    );
+
+    return Math.round(total / completed.length);
   }
 
   async function loadTeacherData() {
@@ -147,8 +168,76 @@ export default function TeacherAssignmentsPage() {
       return;
     }
 
-    setAssignments((assignmentData as AssignmentWithClass[]) ?? []);
+    const loadedAssignments = (assignmentData ?? []) as unknown as AssignmentWithClass[];
+    setAssignments(loadedAssignments);
+
+    if (loadedAssignments.length > 0) {
+      setSelectedAssignment(loadedAssignments[0]);
+      await loadAssignmentResults(loadedAssignments[0]);
+    }
+
     setLoading(false);
+  }
+
+  async function loadAssignmentResults(assignment: AssignmentWithClass) {
+    setLoadingResults(true);
+    setMessage(null);
+    setSelectedAssignment(assignment);
+
+    const { data: membersData, error: membersError } = await supabase
+      .from("class_members")
+      .select("id, class_id, student_id, joined_at")
+      .eq("class_id", assignment.class_id)
+      .order("joined_at", { ascending: true });
+
+    if (membersError) {
+      setMessage(membersError.message);
+      setLoadingResults(false);
+      return;
+    }
+
+    const studentIds = (membersData ?? []).map((member) => member.student_id);
+
+    if (studentIds.length === 0) {
+      setRosterResults([]);
+      setLoadingResults(false);
+      return;
+    }
+
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("*")
+      .in("id", studentIds)
+      .order("display_name", { ascending: true });
+
+    if (profilesError) {
+      setMessage(profilesError.message);
+      setLoadingResults(false);
+      return;
+    }
+
+    const { data: attemptsData, error: attemptsError } = await supabase
+      .from("attempts")
+      .select("*")
+      .eq("assignment_id", assignment.id)
+      .in("student_id", studentIds);
+
+    if (attemptsError) {
+      setMessage(attemptsError.message);
+      setLoadingResults(false);
+      return;
+    }
+
+    const results: RosterResult[] = (profilesData ?? []).map((student) => ({
+      student,
+      attempt:
+        (attemptsData ?? []).find(
+          (attempt) => attempt.student_id === student.id
+        ) ?? null,
+    }));
+
+    setRosterResults(results);
+    setLoadingResults(false);
   }
 
   async function createAssignment(event: React.FormEvent<HTMLFormElement>) {
@@ -191,11 +280,16 @@ export default function TeacherAssignmentsPage() {
       return;
     }
 
-    setAssignments((current) => [data as AssignmentWithClass, ...current]);
+    const newAssignment = data as unknown as AssignmentWithClass;
+
+    setAssignments((current) => [newAssignment, ...current]);
+    setSelectedAssignment(newAssignment);
     setTitle("");
     setDueDate("");
     setMessage("Assignment created.");
     setCreating(false);
+
+    await loadAssignmentResults(newAssignment);
   }
 
   function handleTypeChange(nextType: AssignmentType) {
@@ -207,6 +301,9 @@ export default function TeacherAssignmentsPage() {
     loadTeacherData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const completedCount = rosterResults.filter((result) => result.attempt).length;
+  const averageScore = getAverageScore(rosterResults);
 
   if (loading) {
     return (
@@ -248,8 +345,8 @@ export default function TeacherAssignmentsPage() {
           Assignments
         </h1>
         <p className="mt-4 max-w-2xl leading-8 text-zinc-400">
-          Create ear training and theory practice sets for your classes. Student
-          completion and scores will be connected next.
+          Create practice sets and review student completion, scores, and
+          progress for each class.
         </p>
       </div>
 
@@ -260,7 +357,7 @@ export default function TeacherAssignmentsPage() {
       )}
 
       <div className="grid gap-8 lg:grid-cols-[380px_1fr]">
-        <aside>
+        <aside className="space-y-6">
           <form
             onSubmit={createAssignment}
             className="rounded-3xl border border-white/10 bg-white/[0.03] p-5"
@@ -373,53 +470,173 @@ export default function TeacherAssignmentsPage() {
               </>
             )}
           </form>
+
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+            <h2 className="text-lg font-semibold">Assignments</h2>
+
+            {assignments.length === 0 ? (
+              <p className="mt-4 text-sm leading-6 text-zinc-400">
+                No assignments yet.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {assignments.map((assignment) => (
+                  <button
+                    key={assignment.id}
+                    onClick={() => loadAssignmentResults(assignment)}
+                    className={`w-full rounded-2xl border p-4 text-left transition ${
+                      selectedAssignment?.id === assignment.id
+                        ? "border-violet-400/70 bg-violet-500/15"
+                        : "border-white/10 bg-white/[0.02] hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <p className="font-medium text-white">
+                      {assignment.title}
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-zinc-400">
+                      {getClassName(assignment)} ·{" "}
+                      {getAssignmentTypeLabel(assignment.assignment_type)}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </aside>
 
         <main className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 md:p-8">
-          <h2 className="text-2xl font-semibold">Existing assignments</h2>
-
-          {assignments.length === 0 ? (
-            <p className="mt-4 leading-7 text-zinc-400">
-              No assignments yet. Create one from the form on the left.
-            </p>
-          ) : (
-            <div className="mt-6 space-y-4">
-              {assignments.map((assignment) => (
-                <div
-                  key={assignment.id}
-                  className="rounded-3xl border border-white/10 bg-zinc-950 p-5"
-                >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-white">
-                        {assignment.title}
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-zinc-400">
-                        {getClassName(assignment)} ·{" "}
-                        {getAssignmentTypeLabel(assignment.assignment_type)} ·{" "}
-                        {getModeLabel(
-                          assignment.assignment_type,
-                          assignment.mode
-                        )}{" "}
-                        · {assignment.question_count} questions
-                      </p>
-                    </div>
-
-                    <div className="rounded-full border border-white/10 px-3 py-1 text-sm text-zinc-300">
-                      {assignment.due_date
-                        ? `Due ${new Date(
-                            assignment.due_date
-                          ).toLocaleDateString()}`
-                        : "No due date"}
-                    </div>
-                  </div>
-
-                  <p className="mt-4 text-sm text-zinc-500">
-                    Student completion data will appear after the assignment
-                    runner is connected.
+          {selectedAssignment ? (
+            <>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-violet-300">
+                    RESULTS
+                  </p>
+                  <h2 className="mt-3 text-3xl font-semibold tracking-tight">
+                    {selectedAssignment.title}
+                  </h2>
+                  <p className="mt-3 text-sm leading-6 text-zinc-400">
+                    {getClassName(selectedAssignment)} ·{" "}
+                    {getAssignmentTypeLabel(
+                      selectedAssignment.assignment_type
+                    )}{" "}
+                    ·{" "}
+                    {getModeLabel(
+                      selectedAssignment.assignment_type,
+                      selectedAssignment.mode
+                    )}{" "}
+                    · {selectedAssignment.question_count} questions
                   </p>
                 </div>
-              ))}
+
+                <button
+                  onClick={() => loadAssignmentResults(selectedAssignment)}
+                  className="rounded-full border border-white/15 px-5 py-3 font-medium text-white hover:bg-white/10"
+                >
+                  Refresh results
+                </button>
+              </div>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                <div className="rounded-3xl border border-white/10 bg-zinc-950 p-5">
+                  <p className="text-sm text-zinc-400">Completed</p>
+                  <p className="mt-2 text-3xl font-semibold text-white">
+                    {completedCount}/{rosterResults.length}
+                  </p>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-zinc-950 p-5">
+                  <p className="text-sm text-zinc-400">Average score</p>
+                  <p className="mt-2 text-3xl font-semibold text-white">
+                    {averageScore === null ? "—" : `${averageScore}%`}
+                  </p>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-zinc-950 p-5">
+                  <p className="text-sm text-zinc-400">Due date</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">
+                    {selectedAssignment.due_date
+                      ? new Date(
+                          selectedAssignment.due_date
+                        ).toLocaleDateString()
+                      : "None"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <h3 className="text-xl font-semibold">Student results</h3>
+
+                {loadingResults ? (
+                  <p className="mt-4 text-zinc-400">Loading results...</p>
+                ) : rosterResults.length === 0 ? (
+                  <p className="mt-4 leading-7 text-zinc-400">
+                    No students are currently in this class.
+                  </p>
+                ) : (
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-white/10">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-white/[0.04] text-zinc-300">
+                        <tr>
+                          <th className="px-4 py-3">Student</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Score</th>
+                          <th className="px-4 py-3">Completed</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rosterResults.map((result) => (
+                          <tr
+                            key={result.student.id}
+                            className="border-t border-white/10 text-zinc-300"
+                          >
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="font-medium text-white">
+                                  {result.student.display_name}
+                                </p>
+                                <p className="text-xs text-zinc-500">
+                                  {result.student.school_name ?? "No school"}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {result.attempt ? (
+                                <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+                                  Completed
+                                </span>
+                              ) : (
+                                <span className="rounded-full border border-yellow-400/40 bg-yellow-500/10 px-3 py-1 text-xs text-yellow-100">
+                                  Missing
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {result.attempt
+                                ? `${result.attempt.correct_count}/${result.attempt.total_questions} (${Math.round(Number(result.attempt.score))}%)`
+                                : "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              {result.attempt
+                                ? new Date(
+                                    result.attempt.completed_at
+                                  ).toLocaleString()
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="py-10 text-center">
+              <h2 className="text-2xl font-semibold">No assignment selected</h2>
+              <p className="mt-3 text-zinc-400">
+                Create or select an assignment to view results.
+              </p>
             </div>
           )}
         </main>
