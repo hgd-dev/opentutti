@@ -35,44 +35,38 @@ type SessionRecord = {
 type SessionScreen = "practice" | "review" | "ended";
 type PitchSubmode = "perfect" | "reference";
 
-const modes: { value: EarTrainingMode; label: string; description: string }[] = [
-  {
-    value: "pitch",
-    label: "Pitch",
-    description:
-      "Identify single pitches or compare notes against a reference pitch.",
-  },
-  {
-    value: "keyboard",
-    label: "Keyboard",
-    description:
-      "Hear a note and answer using keyboard-style pitch selection.",
-  },
-  {
-    value: "interval",
-    label: "Intervals",
-    description:
-      "Identify ascending, descending, and harmonic intervals from unison through octave.",
-  },
-  {
-    value: "scale",
-    label: "Scales",
-    description:
-      "Identify major, minor, modal, pentatonic, blues, chromatic, and whole tone scales.",
-  },
-  {
-    value: "chord",
-    label: "Chords",
-    description:
-      "Identify triads, sevenths, suspended chords, and sixth chords.",
-  },
-  {
-    value: "cadence",
-    label: "Cadences",
-    description:
-      "Identify authentic, half, plagal, and deceptive cadences.",
-  },
-];
+const modes: { value: EarTrainingMode; label: string; description: string }[] =
+  [
+    {
+      value: "pitch",
+      label: "Pitch",
+      description:
+        "Identify single pitches or compare notes against a reference pitch.",
+    },
+    {
+      value: "interval",
+      label: "Intervals",
+      description:
+        "Identify ascending, descending, and harmonic intervals from unison through octave.",
+    },
+    {
+      value: "scale",
+      label: "Scales",
+      description:
+        "Identify major, minor, modal, pentatonic, blues, chromatic, and whole tone scales.",
+    },
+    {
+      value: "chord",
+      label: "Chords",
+      description:
+        "Identify triads, sevenths, suspended chords, and sixth chords.",
+    },
+    {
+      value: "cadence",
+      label: "Cadences",
+      description: "Identify authentic, half, plagal, and deceptive cadences.",
+    },
+  ];
 
 const chromaticChoices = [
   "C",
@@ -118,6 +112,24 @@ const intervalQualities = [
   { value: "augmented", label: "Augmented" },
 ];
 
+const intervalQualityValuesByNumber: Record<string, string[]> = {
+  "1": ["perfect"],
+  "2": ["diminished", "minor", "major", "augmented"],
+  "3": ["diminished", "minor", "major", "augmented"],
+  "4": ["diminished", "perfect", "augmented"],
+  "5": ["diminished", "perfect", "augmented"],
+  "6": ["diminished", "minor", "major", "augmented"],
+  "7": ["diminished", "minor", "major", "augmented"],
+  "8": ["diminished", "perfect", "augmented"],
+};
+
+function getValidIntervalQualities(intervalNumber: string) {
+  const validValues = intervalQualityValuesByNumber[intervalNumber] ?? [
+    "perfect",
+  ];
+  return intervalQualities.filter((item) => validValues.includes(item.value));
+}
+
 const emptyStats: Record<EarTrainingMode, DrillStats> = {
   pitch: { attempted: 0, correct: 0 },
   keyboard: { attempted: 0, correct: 0 },
@@ -137,22 +149,26 @@ function getAccuracy(correct: number, attempted: number) {
 }
 
 function selectionToIntervalAnswer(quality: string, number: string) {
+  const numberLabels: Record<string, string> = {
+    "1": "Unison",
+    "2": "2nd",
+    "3": "3rd",
+    "4": "4th",
+    "5": "5th",
+    "6": "6th",
+    "7": "7th",
+    "8": "Octave",
+  };
+
   if (number === "1" && quality === "perfect") return "Unison";
-  if (number === "2" && quality === "minor") return "Minor 2nd";
-  if (number === "2" && quality === "major") return "Major 2nd";
-  if (number === "3" && quality === "minor") return "Minor 3rd";
-  if (number === "3" && quality === "major") return "Major 3rd";
-  if (number === "4" && quality === "perfect") return "Perfect 4th";
   if (number === "4" && quality === "augmented") return "Tritone";
   if (number === "5" && quality === "diminished") return "Tritone";
-  if (number === "5" && quality === "perfect") return "Perfect 5th";
-  if (number === "6" && quality === "minor") return "Minor 6th";
-  if (number === "6" && quality === "major") return "Major 6th";
-  if (number === "7" && quality === "minor") return "Minor 7th";
-  if (number === "7" && quality === "major") return "Major 7th";
-  if (number === "8" && quality === "perfect") return "Octave";
 
-  return `${quality} ${number}`;
+  const intervalNumber = numberLabels[number] ?? number;
+  const qualityLabel =
+    intervalQualities.find((item) => item.value === quality)?.label ?? quality;
+
+  return `${qualityLabel} ${intervalNumber}`;
 }
 
 function getPlaybackSpacing(question: EarTrainingQuestion) {
@@ -194,9 +210,12 @@ async function playQuestion(question: EarTrainingQuestion) {
     synth.triggerAttackRelease(noteGroup, duration, now + index * spacing);
   });
 
-  setTimeout(() => {
-    synth.dispose();
-  }, Math.max(1800, question.notes.length * 900 + 1400));
+  setTimeout(
+    () => {
+      synth.dispose();
+    },
+    Math.max(1800, question.notes.length * 900 + 1400),
+  );
 }
 
 function getQuestionRoot(question: EarTrainingQuestion) {
@@ -284,25 +303,25 @@ function getAdvice(records: SessionRecord[]) {
 
   if (records.some((record) => record.mode === "pitch" && !record.correct)) {
     advice.push(
-      "For Pitch, compare neighboring notes slowly. In Pitch Reference, focus on the distance from the reference before naming the note."
+      "For Pitch, compare neighboring notes slowly. In Pitch Reference, focus on the distance from the reference before naming the note.",
     );
   }
 
   if (records.some((record) => record.mode === "interval" && !record.correct)) {
     advice.push(
-      "For intervals, first decide whether the distance feels small, medium, or wide, then choose quality and number."
+      "For intervals, first decide whether the distance feels small, medium, or wide, then choose quality and number.",
     );
   }
 
   if (records.some((record) => record.mode === "scale" && !record.correct)) {
     advice.push(
-      "For scales, listen for signature color notes: raised 4 for Lydian, lowered 2 for Phrygian, lowered 7 for Mixolydian."
+      "For scales, listen for signature color notes: raised 4 for Lydian, lowered 2 for Phrygian, lowered 7 for Mixolydian.",
     );
   }
 
   if (records.some((record) => record.mode === "chord" && !record.correct)) {
     advice.push(
-      "For chords, first separate triads from sevenths, then listen for major/minor color and tension level."
+      "For chords, first separate triads from sevenths, then listen for major/minor color and tension level.",
     );
   }
 
@@ -318,11 +337,11 @@ export default function EarTrainingGym() {
   >("choice");
 
   const [settings, setSettings] = useState<EarTrainingSettings>(
-    defaultEarTrainingSettings
+    defaultEarTrainingSettings,
   );
 
   const [question, setQuestion] = useState<EarTrainingQuestion>(() =>
-    getRandomEarTrainingQuestion("pitch", defaultEarTrainingSettings)
+    getRandomEarTrainingQuestion("pitch", defaultEarTrainingSettings),
   );
 
   const [selected, setSelected] = useState<string | null>(null);
@@ -341,17 +360,16 @@ export default function EarTrainingGym() {
 
   const accuracy = useMemo(
     () => getAccuracy(correctCount, totalCount),
-    [correctCount, totalCount]
+    [correctCount, totalCount],
   );
 
   const advice = useMemo(() => getAdvice(records), [records]);
 
-  const effectivePitchSelectionMode =
-    mode === "keyboard" ? "keyboard" : pitchSelectionMode;
+  const effectivePitchSelectionMode = pitchSelectionMode;
 
   function getCurrentSettings(
     nextPitchSubmode = pitchSubmode,
-    nextPitchSelectionMode = pitchSelectionMode
+    nextPitchSelectionMode = pitchSelectionMode,
   ): EarTrainingSettings {
     return {
       ...settings,
@@ -383,8 +401,8 @@ export default function EarTrainingGym() {
       setQuestion(
         getRandomEarTrainingQuestion(
           "pitch",
-          getCurrentSettings(nextSubmode, pitchSelectionMode)
-        )
+          getCurrentSettings(nextSubmode, pitchSelectionMode),
+        ),
       );
       setSelected(null);
       setAnswered(false);
@@ -442,7 +460,9 @@ export default function EarTrainingGym() {
     setPitchSubmode("perfect");
     setPitchSelectionMode("choice");
     setSettings(defaultEarTrainingSettings);
-    setQuestion(getRandomEarTrainingQuestion("pitch", defaultEarTrainingSettings));
+    setQuestion(
+      getRandomEarTrainingQuestion("pitch", defaultEarTrainingSettings),
+    );
     setSelected(null);
     setAnswered(false);
     setStats(emptyStats);
@@ -467,7 +487,7 @@ export default function EarTrainingGym() {
   function toggleOption(
     group: "interval" | "scale" | "chord",
     value: string,
-    checked: boolean
+    checked: boolean,
   ) {
     setSettings((current) => {
       const currentList = current[group].enabledAnswers;
@@ -489,14 +509,266 @@ export default function EarTrainingGym() {
 
   const rootNote = getQuestionRoot(question);
 
+  const validIntervalQualities = useMemo(
+    () => getValidIntervalQualities(intervalNumber),
+    [intervalNumber],
+  );
+
   const selectedIntervalStaffNotes =
     mode === "interval"
       ? getIntervalStaffNotesFromSelection(
           rootNote,
           intervalQuality,
-          intervalNumber
+          intervalNumber,
+          question.playbackStyle,
         )
       : [];
+
+  const exerciseSettingsPanel = (
+    <div className="rounded-2xl border border-white/10 bg-zinc-950 p-4">
+      <p className="text-sm font-medium text-white">Exercise Settings</p>
+
+      {mode === "interval" && (
+        <label className="mt-4 block">
+          <span className="text-xs text-zinc-500">Playback type</span>
+          <select
+            value={settings.interval.playback}
+            onChange={(event) => {
+              const playback = event.target
+                .value as EarTrainingSettings["interval"]["playback"];
+              const nextSettings: EarTrainingSettings = {
+                ...settings,
+                interval: {
+                  ...settings.interval,
+                  playback,
+                  ascending: playback === "ascending",
+                  descending: playback === "descending",
+                  harmonic: playback === "harmonic",
+                },
+              };
+
+              setSettings(nextSettings);
+              setQuestion(getRandomEarTrainingQuestion("interval", nextSettings));
+              setSelected(null);
+              setAnswered(false);
+              setIntervalQuality("perfect");
+              setIntervalNumber("1");
+            }}
+            className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
+          >
+            <option value="ascending">Ascending</option>
+            <option value="descending">Descending</option>
+            <option value="harmonic">Harmonic</option>
+          </select>
+        </label>
+      )}
+
+      {mode === "scale" && (
+        <label className="mt-4 block">
+          <span className="text-xs text-zinc-500">Playback type</span>
+          <select
+            value={settings.scale.playback}
+            onChange={(event) => {
+              const playback = event.target
+                .value as EarTrainingSettings["scale"]["playback"];
+              const nextSettings: EarTrainingSettings = {
+                ...settings,
+                scale: {
+                  ...settings.scale,
+                  playback,
+                  ascending: playback === "ascending",
+                  descending: playback === "descending",
+                },
+              };
+
+              setSettings(nextSettings);
+              setQuestion(getRandomEarTrainingQuestion("scale", nextSettings));
+              setSelected(null);
+              setAnswered(false);
+            }}
+            className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
+          >
+            <option value="ascending">Ascending</option>
+            <option value="descending">Descending</option>
+          </select>
+        </label>
+      )}
+
+      {mode === "chord" && (
+        <label className="mt-4 block">
+          <span className="text-xs text-zinc-500">Playback type</span>
+          <select
+            value={settings.chord.playback}
+            onChange={(event) => {
+              const playback = event.target.value as "blocked" | "arpeggiated";
+              const nextSettings: EarTrainingSettings = {
+                ...settings,
+                chord: {
+                  ...settings.chord,
+                  playback,
+                },
+              };
+
+              setSettings(nextSettings);
+              setQuestion(getRandomEarTrainingQuestion("chord", nextSettings));
+              setSelected(null);
+              setAnswered(false);
+            }}
+            className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
+          >
+            <option value="blocked">Blocked</option>
+            <option value="arpeggiated">Arpeggiated</option>
+          </select>
+        </label>
+      )}
+
+      <details className="mt-4">
+        <summary className="cursor-pointer text-sm text-zinc-300">
+          Clefs and range
+        </summary>
+
+        <div className="mt-3 space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {earTrainingOptionLists.clefs.map((clef) => (
+              <label
+                key={clef}
+                className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-zinc-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.clefs.includes(clef)}
+                  onChange={(event) => toggleClef(clef, event.target.checked)}
+                />
+                {clef}
+              </label>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label>
+              <span className="text-xs text-zinc-500">Low</span>
+              <select
+                value={settings.range.low}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    range: {
+                      ...current.range,
+                      low: event.target.value,
+                    },
+                  }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
+              >
+                {earTrainingOptionLists.rangeNotes.map((note) => (
+                  <option key={note}>{note}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              <span className="text-xs text-zinc-500">High</span>
+              <select
+                value={settings.range.high}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    range: {
+                      ...current.range,
+                      high: event.target.value,
+                    },
+                  }))
+                }
+                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
+              >
+                {earTrainingOptionLists.rangeNotes.map((note) => (
+                  <option key={note}>{note}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+      </details>
+
+      {mode === "interval" && (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm text-zinc-300">
+            Interval types
+          </summary>
+
+          <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+            {earTrainingOptionLists.intervals.map((item) => (
+              <label
+                key={item}
+                className="flex items-center gap-2 text-xs text-zinc-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.interval.enabledAnswers.includes(item)}
+                  onChange={(event) =>
+                    toggleOption("interval", item, event.target.checked)
+                  }
+                />
+                {item}
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {mode === "scale" && (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm text-zinc-300">
+            Scale types
+          </summary>
+
+          <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+            {earTrainingOptionLists.scales.map((item) => (
+              <label
+                key={item}
+                className="flex items-center gap-2 text-xs text-zinc-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.scale.enabledAnswers.includes(item)}
+                  onChange={(event) =>
+                    toggleOption("scale", item, event.target.checked)
+                  }
+                />
+                {item}
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {mode === "chord" && (
+        <details className="mt-4">
+          <summary className="cursor-pointer text-sm text-zinc-300">
+            Chord types
+          </summary>
+
+          <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+            {earTrainingOptionLists.chords.map((item) => (
+              <label
+                key={item}
+                className="flex items-center gap-2 text-xs text-zinc-300"
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.chord.enabledAnswers.includes(item)}
+                  onChange={(event) =>
+                    toggleOption("chord", item, event.target.checked)
+                  }
+                />
+                {item}
+              </label>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
 
   if (screen === "review" || screen === "ended") {
     return (
@@ -653,553 +925,380 @@ export default function EarTrainingGym() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
-      <aside className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-        <h2 className="text-lg font-semibold">Choose a drill</h2>
-
-        <div className="mt-5 space-y-3">
-          {modes.map((item) => (
-            <button
-              key={item.value}
-              onClick={() => changeMode(item.value)}
-              className={`w-full rounded-2xl border p-4 text-left transition ${
-                mode === item.value
-                  ? "border-violet-400/70 bg-violet-500/15"
-                  : "border-white/10 bg-white/[0.02] hover:bg-white/[0.06]"
-              }`}
-            >
-              <p className="font-medium text-white">{item.label}</p>
-
-              {mode === item.value && (
-                <p className="mt-1 text-sm leading-6 text-zinc-400">
-                  {item.description}
-                </p>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-6 rounded-2xl border border-white/10 bg-zinc-950 p-4">
-          <p className="text-sm font-medium text-white">Exercise settings</p>
-
-          <details className="mt-4">
-            <summary className="cursor-pointer text-sm text-zinc-300">
-              Clefs and range
-            </summary>
-
-            <div className="mt-3 space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                {earTrainingOptionLists.clefs.map((clef) => (
-                  <label
-                    key={clef}
-                    className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-zinc-300"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={settings.clefs.includes(clef)}
-                      onChange={(event) => toggleClef(clef, event.target.checked)}
-                    />
-                    {clef}
-                  </label>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <label>
-                  <span className="text-xs text-zinc-500">Low</span>
-                  <select
-                    value={settings.range.low}
-                    onChange={(event) =>
-                      setSettings((current) => ({
-                        ...current,
-                        range: {
-                          ...current.range,
-                          low: event.target.value,
-                        },
-                      }))
-                    }
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
-                  >
-                    {earTrainingOptionLists.rangeNotes.map((note) => (
-                      <option key={note}>{note}</option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  <span className="text-xs text-zinc-500">High</span>
-                  <select
-                    value={settings.range.high}
-                    onChange={(event) =>
-                      setSettings((current) => ({
-                        ...current,
-                        range: {
-                          ...current.range,
-                          high: event.target.value,
-                        },
-                      }))
-                    }
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
-                  >
-                    {earTrainingOptionLists.rangeNotes.map((note) => (
-                      <option key={note}>{note}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
-          </details>
-
-          {mode === "interval" && (
-            <details className="mt-4">
-              <summary className="cursor-pointer text-sm text-zinc-300">
-                Interval types
-              </summary>
-
-              <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
-                {earTrainingOptionLists.intervals.map((item) => (
-                  <label
-                    key={item}
-                    className="flex items-center gap-2 text-xs text-zinc-300"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={settings.interval.enabledAnswers.includes(item)}
-                      onChange={(event) =>
-                        toggleOption("interval", item, event.target.checked)
-                      }
-                    />
-                    {item}
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-3 grid gap-2 text-xs text-zinc-300">
-                {(["ascending", "descending", "harmonic"] as const).map(
-                  (kind) => (
-                    <label key={kind} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.interval[kind]}
-                        onChange={(event) => {
-                          const next = {
-                            ...settings.interval,
-                            [kind]: event.target.checked,
-                          };
-
-                          if (!next.ascending && !next.descending && !next.harmonic) {
-                            return;
-                          }
-
-                          setSettings((current) => ({
-                            ...current,
-                            interval: next,
-                          }));
-                        }}
-                      />
-                      {kind}
-                    </label>
-                  )
-                )}
-              </div>
-            </details>
-          )}
-
-          {mode === "scale" && (
-            <details className="mt-4">
-              <summary className="cursor-pointer text-sm text-zinc-300">
-                Scale types
-              </summary>
-
-              <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
-                {earTrainingOptionLists.scales.map((item) => (
-                  <label
-                    key={item}
-                    className="flex items-center gap-2 text-xs text-zinc-300"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={settings.scale.enabledAnswers.includes(item)}
-                      onChange={(event) =>
-                        toggleOption("scale", item, event.target.checked)
-                      }
-                    />
-                    {item}
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-3 grid gap-2 text-xs text-zinc-300">
-                {(["ascending", "descending"] as const).map((kind) => (
-                  <label key={kind} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={settings.scale[kind]}
-                      onChange={(event) => {
-                        const next = {
-                          ...settings.scale,
-                          [kind]: event.target.checked,
-                        };
-
-                        if (!next.ascending && !next.descending) return;
-
-                        setSettings((current) => ({
-                          ...current,
-                          scale: next,
-                        }));
-                      }}
-                    />
-                    {kind}
-                  </label>
-                ))}
-              </div>
-            </details>
-          )}
-
-          {mode === "chord" && (
-            <details className="mt-4">
-              <summary className="cursor-pointer text-sm text-zinc-300">
-                Chord types
-              </summary>
-
-              <label className="mt-3 block">
-                <span className="text-xs text-zinc-500">Playback</span>
-                <select
-                  value={settings.chord.playback}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      chord: {
-                        ...current.chord,
-                        playback: event.target.value as
-                          | "blocked"
-                          | "arpeggiated",
-                      },
-                    }))
-                  }
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-xs text-white"
-                >
-                  <option value="blocked">Blocked</option>
-                  <option value="arpeggiated">Arpeggiated</option>
-                </select>
-              </label>
-
-              <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
-                {earTrainingOptionLists.chords.map((item) => (
-                  <label
-                    key={item}
-                    className="flex items-center gap-2 text-xs text-zinc-300"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={settings.chord.enabledAnswers.includes(item)}
-                      onChange={(event) =>
-                        toggleOption("chord", item, event.target.checked)
-                      }
-                    />
-                    {item}
-                  </label>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-
-        <div className="mt-6 rounded-2xl border border-white/10 bg-zinc-950 p-4">
-          <p className="text-sm text-zinc-400">Session score</p>
-          <p className="mt-2 text-3xl font-semibold">
-            {correctCount}/{totalCount}
+    <div className="space-y-6">
+      <div className="flex flex-col gap-5 rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:flex-row md:items-start md:justify-between md:p-6">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-violet-300">PRACTICE TOOL</p>
+          <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+            Ear Training Gym
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">
+            Choose a drill, adjust the settings, listen, and review the answer
+            after each response.
           </p>
-          <p className="mt-1 text-sm text-zinc-500">{accuracy}% accuracy</p>
-
-          <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
-            {modes.map((item) => {
-              const drill = stats[item.value];
-
-              return (
-                <div
-                  key={item.value}
-                  className="flex items-center justify-between text-xs text-zinc-400"
-                >
-                  <span>{item.label}</span>
-                  <span>
-                    {drill.correct}/{drill.attempted}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
 
-        <button
-          onClick={() => setScreen("review")}
-          className="mt-5 w-full rounded-full border border-white/15 px-5 py-3 text-sm font-medium text-white hover:bg-white/10"
-        >
-          Review and end session
-        </button>
-      </aside>
+        <div className="w-full md:max-w-xl">{exerciseSettingsPanel}</div>
+      </div>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-6">
-            <div className="min-w-0 md:w-[52%]">
-              <p className="text-sm font-medium text-violet-300">
-                {mode === "pitch" ? "PITCH" : `${mode.toUpperCase()} TRAINING`}
-              </p>
+      <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
+        <aside className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+          <h2 className="text-lg font-semibold">Choose a drill</h2>
 
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight">
-                {question.prompt}
-              </h2>
-            </div>
+          <div className="mt-5 space-y-3">
+            {modes.map((item) => (
+              <button
+                key={item.value}
+                onClick={() => changeMode(item.value)}
+                className={`w-full rounded-2xl border p-4 text-left transition ${
+                  mode === item.value
+                    ? "border-violet-400/70 bg-violet-500/15"
+                    : "border-white/10 bg-white/[0.02] hover:bg-white/[0.06]"
+                }`}
+              >
+                <p className="font-medium text-white">{item.label}</p>
 
-            <div className="min-w-0 md:flex-1">
-              <p className="text-sm leading-6 text-zinc-400">
-                Listen carefully, then enter the best answer.
-              </p>
+                {mode === item.value && (
+                  <p className="mt-1 text-sm leading-6 text-zinc-400">
+                    {item.description}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
 
-              <p className="mt-1 text-xs text-zinc-500">
-                Playback: {question.playbackStyle.replaceAll("-", " ")}
-              </p>
+          <div className="mt-6 rounded-2xl border border-white/10 bg-zinc-950 p-4">
+            <p className="text-sm text-zinc-400">Session score</p>
+            <p className="mt-2 text-3xl font-semibold">
+              {correctCount}/{totalCount}
+            </p>
+            <p className="mt-1 text-sm text-zinc-500">{accuracy}% accuracy</p>
+
+            <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
+              {modes.map((item) => {
+                const drill = stats[item.value];
+
+                return (
+                  <div
+                    key={item.value}
+                    className="flex items-center justify-between text-xs text-zinc-400"
+                  >
+                    <span>{item.label}</span>
+                    <span>
+                      {drill.correct}/{drill.attempted}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           <button
-            onClick={() => playQuestion(question)}
-            className="shrink-0 rounded-full bg-violet-500 px-5 py-3 font-medium text-white hover:bg-violet-400"
+            onClick={() => setScreen("review")}
+            className="mt-5 w-full rounded-full border border-white/15 px-5 py-3 text-sm font-medium text-white hover:bg-white/10"
           >
-            Play sound
+            Review and end session
           </button>
-        </div>
+        </aside>
 
-        {(mode === "pitch" || mode === "keyboard") && (
-          <div className="mt-5">
-            {mode === "pitch" && (
-              <div className="mb-5 flex flex-col gap-4 lg:flex-row">
-                <label className="block max-w-xs">
-                  <span className="text-sm text-zinc-400">Pitch mode</span>
-                  <select
-                    value={pitchSubmode}
-                    onChange={(event) =>
-                      changePitchSubmode(event.target.value as PitchSubmode)
-                    }
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
-                  >
-                    <option value="perfect">Pitch Perfect</option>
-                    <option value="reference">Pitch Reference</option>
-                  </select>
-                </label>
+        <section className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 md:p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-6">
+              <div className="min-w-0 md:w-[52%]">
+                <p className="text-sm font-medium text-violet-300">
+                  {mode === "pitch"
+                    ? "PITCH"
+                    : `${mode.toUpperCase()} TRAINING`}
+                </p>
 
-                <label className="block max-w-xs">
-                  <span className="text-sm text-zinc-400">Selection type</span>
-                  <select
-                    value={pitchSelectionMode}
-                    onChange={(event) => {
-                      const value = event.target.value as "choice" | "keyboard";
-                      setPitchSelectionMode(value);
-                      setSettings((current) => ({
-                        ...current,
-                        pitch: {
-                          ...current.pitch,
-                          answerMode: value,
-                        },
-                      }));
-                    }}
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
-                  >
-                    <option value="choice">Choice selection</option>
-                    <option value="keyboard">Keyboard selection</option>
-                  </select>
-                </label>
-              </div>
-            )}
-
-            {effectivePitchSelectionMode === "choice" ? (
-              <div className="flex flex-wrap gap-2">
-                {chromaticChoices.map((choice) => {
-                  const chosen = selected === choice;
-                  const correctChoice = answered && choice === question.answer;
-                  const wrongChoice =
-                    answered && chosen && choice !== question.answer;
-
-                  return (
-                    <button
-                      key={choice}
-                      onClick={() => submitAnswer(choice)}
-                      className={`rounded-2xl border px-4 py-3 text-base font-semibold transition ${
-                        correctChoice
-                          ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
-                          : wrongChoice
-                            ? "border-red-400/70 bg-red-500/15 text-red-100"
-                            : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
-                      }`}
-                    >
-                      {choice}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <PianoKeyboard selected={selected} onSelect={submitAnswer} />
-            )}
-          </div>
-        )}
-
-        {mode === "interval" && (
-          <div className="mt-5">
-            <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-              <div className="rounded-3xl border border-white/10 bg-zinc-950 p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label>
-                    <span className="text-sm text-zinc-400">
-                      Interval number
-                    </span>
-                    <select
-                      value={intervalNumber}
-                      onChange={(event) => setIntervalNumber(event.target.value)}
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
-                    >
-                      {intervalNumbers.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span className="text-sm text-zinc-400">Quality</span>
-                    <select
-                      value={intervalQuality}
-                      onChange={(event) =>
-                        setIntervalQuality(event.target.value)
-                      }
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
-                    >
-                      {intervalQualities.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <button
-                  onClick={submitIntervalAnswer}
-                  disabled={answered}
-                  className="mt-5 rounded-full bg-violet-500 px-5 py-3 font-medium text-white hover:bg-violet-400 disabled:opacity-60"
-                >
-                  Submit interval
-                </button>
+                <h2 className="mt-2 text-3xl font-semibold tracking-tight">
+                  {question.prompt}
+                </h2>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-zinc-950 p-4">
-                <p className="mb-3 text-sm text-zinc-400">Your response</p>
-                <p className="text-xs leading-5 text-zinc-500">
-                  Staff preview appears after you submit.
+              <div className="min-w-0 md:flex-1">
+                <p className="text-sm leading-6 text-zinc-400">
+                  Listen carefully, then enter the best answer.
+                </p>
+
+                <p className="mt-1 text-xs text-zinc-500">
+                  Playback: {question.playbackStyle.replaceAll("-", " ")}
                 </p>
               </div>
             </div>
-          </div>
-        )}
 
-        {(mode === "scale" || mode === "chord" || mode === "cadence") && (
-          <div className="mt-8 grid gap-3 sm:grid-cols-2">
-            {question.choices.map((choice) => {
-              const chosen = selected === choice;
-              const correctChoice = answered && choice === question.answer;
-              const wrongChoice =
-                answered && chosen && choice !== question.answer;
-
-              return (
-                <button
-                  key={choice}
-                  onClick={() => submitAnswer(choice)}
-                  className={`rounded-2xl border p-5 text-left text-lg font-medium transition ${
-                    correctChoice
-                      ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
-                      : wrongChoice
-                        ? "border-red-400/70 bg-red-500/15 text-red-100"
-                        : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
-                  }`}
-                >
-                  {choice}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {answered && (
-          <div className="mt-6 rounded-3xl border border-white/10 bg-zinc-950 p-5">
-            <p
-              className={`text-lg font-semibold ${
-                isCorrect ? "text-emerald-300" : "text-red-300"
-              }`}
+            <button
+              onClick={() => playQuestion(question)}
+              className="shrink-0 rounded-full bg-violet-500 px-5 py-3 font-medium text-white hover:bg-violet-400"
             >
-              {isCorrect ? "Correct." : `Not quite. Answer: ${question.answer}`}
-            </p>
+              Play sound
+            </button>
+          </div>
 
-            <p className="mt-3 leading-8 text-zinc-300">
-              {question.explanation}
-            </p>
+          {mode === "pitch" && (
+            <div className="mt-5">
+              {mode === "pitch" && (
+                <div className="mb-5 flex flex-col gap-4 lg:flex-row">
+                  <label className="block max-w-xs">
+                    <span className="text-sm text-zinc-400">Pitch mode</span>
+                    <select
+                      value={pitchSubmode}
+                      onChange={(event) =>
+                        changePitchSubmode(event.target.value as PitchSubmode)
+                      }
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
+                    >
+                      <option value="perfect">Pitch Perfect</option>
+                      <option value="reference">Pitch Reference (C)</option>
+                    </select>
+                  </label>
 
-            {mode === "interval" && (
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <label className="block max-w-xs">
+                    <span className="text-sm text-zinc-400">
+                      Selection type
+                    </span>
+                    <select
+                      value={pitchSelectionMode}
+                      onChange={(event) => {
+                        const value = event.target.value as
+                          "choice" | "keyboard";
+                        setPitchSelectionMode(value);
+                        setSettings((current) => ({
+                          ...current,
+                          pitch: {
+                            ...current.pitch,
+                            answerMode: value,
+                          },
+                        }));
+                      }}
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
+                    >
+                      <option value="choice">Choice selection</option>
+                      <option value="keyboard">Keyboard selection</option>
+                    </select>
+                  </label>
+                </div>
+              )}
+
+              {effectivePitchSelectionMode === "choice" ? (
+                <div className="flex flex-wrap gap-2">
+                  {chromaticChoices.map((choice) => {
+                    const chosen = selected === choice;
+                    const correctChoice =
+                      answered && choice === question.answer;
+                    const wrongChoice =
+                      answered && chosen && choice !== question.answer;
+
+                    return (
+                      <button
+                        key={choice}
+                        onClick={() => submitAnswer(choice)}
+                        className={`rounded-2xl border px-4 py-3 text-base font-semibold transition ${
+                          correctChoice
+                            ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
+                            : wrongChoice
+                              ? "border-red-400/70 bg-red-500/15 text-red-100"
+                              : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        {choice}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <PianoKeyboard selected={selected} onSelect={submitAnswer} />
+              )}
+            </div>
+          )}
+
+          {mode === "interval" && (
+            <div className="mt-5">
+              <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+                <div className="rounded-3xl border border-white/10 bg-zinc-950 p-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label>
+                      <span className="text-sm text-zinc-400">
+                        Interval number
+                      </span>
+                      <select
+                        value={intervalNumber}
+                        onChange={(event) => {
+                          const nextNumber = event.target.value;
+                          const nextQualities =
+                            getValidIntervalQualities(nextNumber);
+
+                          setIntervalNumber(nextNumber);
+
+                          if (
+                            !nextQualities.some(
+                              (item) => item.value === intervalQuality,
+                            )
+                          ) {
+                            setIntervalQuality(
+                              nextQualities[0]?.value ?? "perfect",
+                            );
+                          }
+                        }}
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
+                      >
+                        {intervalNumbers.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      <span className="text-sm text-zinc-400">Quality</span>
+                      <select
+                        value={intervalQuality}
+                        onChange={(event) =>
+                          setIntervalQuality(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
+                      >
+                        {validIntervalQualities.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={submitIntervalAnswer}
+                    disabled={answered}
+                    className="mt-5 rounded-full bg-violet-500 px-5 py-3 font-medium text-white hover:bg-violet-400 disabled:opacity-60"
+                  >
+                    Submit interval
+                  </button>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-zinc-950 p-4">
                   <p className="mb-3 text-sm text-zinc-400">Your response</p>
                   <StaffChoice
                     notes={selectedIntervalStaffNotes}
                     clef={question.clef ?? "treble"}
-                    width={300}
-                    height={125}
+                    width={250}
+                    height={170}
                   />
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="mb-3 text-sm text-zinc-400">Correct answer</p>
-                  <StaffChoice
-                    notes={question.staffAnswerNotes ?? []}
-                    clef={question.clef ?? "treble"}
-                    width={300}
-                    height={125}
-                  />
+                  <p className="mt-3 text-xs leading-5 text-zinc-500">
+                    Preview follows the current question direction:{" "}
+                    {question.playbackStyle === "harmonic"
+                      ? "harmonic"
+                      : question.playbackStyle === "melodic-descending"
+                        ? "descending"
+                        : "ascending"}
+                    .
+                  </p>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {mode !== "interval" &&
-              question.staffAnswerNotes &&
-              question.staffAnswerNotes.length > 0 && (
-                <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="mb-3 text-sm text-zinc-400">Answer staff</p>
-                  <StaffChoice
-                    notes={question.staffAnswerNotes}
-                    clef={question.clef ?? "treble"}
-                    width={360}
-                    height={125}
-                  />
+          {(mode === "scale" || mode === "chord" || mode === "cadence") && (
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {question.choices.map((choice) => {
+                const chosen = selected === choice;
+                const correctChoice = answered && choice === question.answer;
+                const wrongChoice =
+                  answered && chosen && choice !== question.answer;
+
+                return (
+                  <button
+                    key={choice}
+                    onClick={() => submitAnswer(choice)}
+                    className={`rounded-2xl border p-5 text-left text-lg font-medium transition ${
+                      correctChoice
+                        ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
+                        : wrongChoice
+                          ? "border-red-400/70 bg-red-500/15 text-red-100"
+                          : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    {choice}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {answered && (
+            <div className="mt-6 rounded-3xl border border-white/10 bg-zinc-950 p-5">
+              <p
+                className={`text-lg font-semibold ${
+                  isCorrect ? "text-emerald-300" : "text-red-300"
+                }`}
+              >
+                {isCorrect
+                  ? "Correct."
+                  : `Not quite. Answer: ${question.answer}`}
+              </p>
+
+              <p className="mt-3 leading-8 text-zinc-300">
+                {question.explanation}
+              </p>
+
+              {mode === "interval" && (
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <p className="mb-3 text-sm text-zinc-400">Your response</p>
+                    <StaffChoice
+                      notes={selectedIntervalStaffNotes}
+                      clef={question.clef ?? "treble"}
+                      width={300}
+                      height={170}
+                    />
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <p className="mb-3 text-sm text-zinc-400">Correct answer</p>
+                    <StaffChoice
+                      notes={question.staffAnswerNotes ?? []}
+                      clef={question.clef ?? "treble"}
+                      width={300}
+                      height={170}
+                    />
+                  </div>
                 </div>
               )}
 
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={() => playQuestion(question)}
-                className="rounded-full border border-white/15 px-5 py-3 font-medium hover:bg-white/10"
-              >
-                Replay
-              </button>
+              {mode !== "interval" &&
+                question.staffAnswerNotes &&
+                question.staffAnswerNotes.length > 0 && (
+                  <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                    <p className="mb-3 text-sm text-zinc-400">Answer staff</p>
+                    <StaffChoice
+                      notes={question.staffAnswerNotes}
+                      clef={question.clef ?? "treble"}
+                      width={360}
+                      height={150}
+                    />
+                  </div>
+                )}
 
-              <button
-                onClick={nextQuestion}
-                className="rounded-full bg-violet-500 px-5 py-3 font-medium text-white hover:bg-violet-400"
-              >
-                Next question
-              </button>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <button
+                  onClick={() => playQuestion(question)}
+                  className="rounded-full border border-white/15 px-5 py-3 font-medium hover:bg-white/10"
+                >
+                  Replay
+                </button>
+
+                <button
+                  onClick={nextQuestion}
+                  className="rounded-full bg-violet-500 px-5 py-3 font-medium text-white hover:bg-violet-400"
+                >
+                  Next question
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

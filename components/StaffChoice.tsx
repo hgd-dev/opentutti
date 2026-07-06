@@ -11,15 +11,17 @@ import {
 } from "vexflow";
 import type { EarClef } from "@/lib/music/earTraining";
 
+export type StaffChoiceNote = string | string[];
+
 type StaffChoiceProps = {
-  notes: string[];
+  notes: StaffChoiceNote[];
   clef?: EarClef;
   width?: number;
   height?: number;
 };
 
 function pitchToVexKey(pitch: string) {
-  const match = pitch.match(/^([A-G])([#b]?)(\d)$/);
+  const match = pitch.match(/^([A-G])([#b]{0,2})(\d)$/);
 
   if (!match) {
     return "c/4";
@@ -29,22 +31,27 @@ function pitchToVexKey(pitch: string) {
   return `${letter.toLowerCase()}${accidental}/${octave}`;
 }
 
-function createStaveNote(pitch: string) {
-  const match = pitch.match(/^([A-G])([#b]?)(\d)$/);
-  const accidental = match?.[2];
+function createStaveNote(input: StaffChoiceNote, clef: EarClef) {
+  const pitches = Array.isArray(input) ? input : [input];
 
   const note = new StaveNote({
-    keys: [pitchToVexKey(pitch)],
+    keys: pitches.map((pitch) => pitchToVexKey(pitch)),
     duration: "q",
+    clef,
   });
 
-  if (accidental) {
+  pitches.forEach((pitch, index) => {
+    const match = pitch.match(/^([A-G])([#b]{0,2})(\d)$/);
+    const accidental = match?.[2];
+
+    if (!accidental) return;
+
     try {
-      note.addModifier(new Accidental(accidental), 0);
+      note.addModifier(new Accidental(accidental), index);
     } catch {
       note.addModifier(new Accidental(accidental));
     }
-  }
+  });
 
   return note;
 }
@@ -53,7 +60,7 @@ export default function StaffChoice({
   notes,
   clef = "treble",
   width = 300,
-  height = 125,
+  height = 150,
 }: StaffChoiceProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -67,10 +74,10 @@ export default function StaffChoice({
 
     const context = renderer.getContext();
 
-    const stave = new Stave(8, 8, width - 16);
+    const stave = new Stave(8, 18, width - 16);
     stave.addClef(clef).setContext(context).draw();
 
-    const staveNotes = notes.map((pitch) => createStaveNote(pitch));
+    const staveNotes = notes.map((pitch) => createStaveNote(pitch, clef));
 
     const voice = new Voice({
       numBeats: Math.max(staveNotes.length, 1),
@@ -87,19 +94,16 @@ export default function StaffChoice({
 
     if (svg) {
       svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-      svg.setAttribute("width", `${width}`);
-      svg.setAttribute("height", `${height}`);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      svg.style.width = "100%";
+      svg.style.height = "auto";
       svg.style.display = "block";
-      svg.style.overflow = "visible";
     }
   }, [notes, clef, width, height]);
 
   return (
-    <div
-      className="inline-flex rounded-2xl bg-white"
-      style={{ width, height, overflow: "hidden" }}
-    >
-      <div ref={containerRef} style={{ width, height }} />
+    <div className="overflow-hidden rounded-3xl bg-white p-3">
+      <div ref={containerRef} />
     </div>
   );
 }

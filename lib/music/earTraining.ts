@@ -1,10 +1,5 @@
 export type EarTrainingMode =
-  | "pitch"
-  | "keyboard"
-  | "interval"
-  | "scale"
-  | "chord"
-  | "cadence";
+  "pitch" | "keyboard" | "interval" | "scale" | "chord" | "cadence";
 
 export type EarPlaybackStyle =
   | "single"
@@ -32,7 +27,7 @@ export type EarTrainingQuestion = {
   explanation: string;
   clef?: EarClef;
   rootNote?: string;
-  staffAnswerNotes?: string[];
+  staffAnswerNotes?: (string | string[])[];
 };
 
 export type EarTrainingSettings = {
@@ -47,12 +42,14 @@ export type EarTrainingSettings = {
     referenceNote: string;
   };
   interval: {
+    playback: "ascending" | "descending" | "harmonic";
     ascending: boolean;
     descending: boolean;
     harmonic: boolean;
     enabledAnswers: string[];
   };
   scale: {
+    playback: "ascending" | "descending";
     ascending: boolean;
     descending: boolean;
     enabledAnswers: string[];
@@ -150,64 +147,56 @@ const intervalDefinitions: IntervalDefinition[] = [
     semitones: 3,
     number: "3",
     quality: "minor",
-    explanation:
-      "A minor 3rd has a darker sound than a major 3rd.",
+    explanation: "A minor 3rd has a darker sound than a major 3rd.",
   },
   {
     label: "Major 3rd",
     semitones: 4,
     number: "3",
     quality: "major",
-    explanation:
-      "A major 3rd sounds bright and stable.",
+    explanation: "A major 3rd sounds bright and stable.",
   },
   {
     label: "Perfect 4th",
     semitones: 5,
     number: "4",
     quality: "perfect",
-    explanation:
-      "A perfect 4th sounds open and strong.",
+    explanation: "A perfect 4th sounds open and strong.",
   },
   {
     label: "Tritone",
     semitones: 6,
     number: "4",
     quality: "augmented",
-    explanation:
-      "A tritone divides the octave in half and sounds unstable.",
+    explanation: "A tritone divides the octave in half and sounds unstable.",
   },
   {
     label: "Perfect 5th",
     semitones: 7,
     number: "5",
     quality: "perfect",
-    explanation:
-      "A perfect 5th sounds open, stable, and consonant.",
+    explanation: "A perfect 5th sounds open, stable, and consonant.",
   },
   {
     label: "Minor 6th",
     semitones: 8,
     number: "6",
     quality: "minor",
-    explanation:
-      "A minor 6th is wide and darker than a major 6th.",
+    explanation: "A minor 6th is wide and darker than a major 6th.",
   },
   {
     label: "Major 6th",
     semitones: 9,
     number: "6",
     quality: "major",
-    explanation:
-      "A major 6th is wide, warm, and lyrical.",
+    explanation: "A major 6th is wide, warm, and lyrical.",
   },
   {
     label: "Minor 7th",
     semitones: 10,
     number: "7",
     quality: "minor",
-    explanation:
-      "A minor 7th is wide and unresolved.",
+    explanation: "A minor 7th is wide and unresolved.",
   },
   {
     label: "Major 7th",
@@ -255,14 +244,12 @@ const chordDefinitions: ChordDefinition[] = [
   {
     label: "Suspended 2nd",
     semitones: [0, 2, 7],
-    explanation:
-      "A suspended 2nd replaces the 3rd of the triad with the 2nd.",
+    explanation: "A suspended 2nd replaces the 3rd of the triad with the 2nd.",
   },
   {
     label: "Suspended 4th",
     semitones: [0, 5, 7],
-    explanation:
-      "A suspended 4th replaces the 3rd of the triad with the 4th.",
+    explanation: "A suspended 4th replaces the 3rd of the triad with the 4th.",
   },
   {
     label: "Dominant 7th",
@@ -297,14 +284,12 @@ const chordDefinitions: ChordDefinition[] = [
   {
     label: "Diminished 7th",
     semitones: [0, 3, 6, 9],
-    explanation:
-      "A diminished 7th stacks minor thirds and sounds very tense.",
+    explanation: "A diminished 7th stacks minor thirds and sounds very tense.",
   },
   {
     label: "Augmented 7th",
     semitones: [0, 4, 8, 10],
-    explanation:
-      "An augmented 7th has an augmented triad plus a minor 7th.",
+    explanation: "An augmented 7th has an augmented triad plus a minor 7th.",
   },
   {
     label: "Augmented-major 7th",
@@ -315,14 +300,12 @@ const chordDefinitions: ChordDefinition[] = [
   {
     label: "Major 6th Chord",
     semitones: [0, 4, 7, 9],
-    explanation:
-      "A major 6th chord is a major triad with an added major 6th.",
+    explanation: "A major 6th chord is a major triad with an added major 6th.",
   },
   {
     label: "Minor 6th Chord",
     semitones: [0, 3, 7, 9],
-    explanation:
-      "A minor 6th chord is a minor triad with an added major 6th.",
+    explanation: "A minor 6th chord is a minor triad with an added major 6th.",
   },
 ];
 
@@ -360,20 +343,17 @@ const scaleDefinitions: ScaleDefinition[] = [
   {
     label: "Phrygian",
     semitones: [0, 1, 3, 5, 7, 8, 10, 12],
-    explanation:
-      "Phrygian sounds minor with a distinctive lowered 2nd.",
+    explanation: "Phrygian sounds minor with a distinctive lowered 2nd.",
   },
   {
     label: "Lydian",
     semitones: [0, 2, 4, 6, 7, 9, 11, 12],
-    explanation:
-      "Lydian sounds major with a bright raised 4th.",
+    explanation: "Lydian sounds major with a bright raised 4th.",
   },
   {
     label: "Mixolydian",
     semitones: [0, 2, 4, 5, 7, 9, 10, 12],
-    explanation:
-      "Mixolydian sounds major with a lowered 7th.",
+    explanation: "Mixolydian sounds major with a lowered 7th.",
   },
   {
     label: "Locrian",
@@ -384,8 +364,7 @@ const scaleDefinitions: ScaleDefinition[] = [
   {
     label: "Chromatic",
     semitones: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    explanation:
-      "The chromatic scale moves by half steps.",
+    explanation: "The chromatic scale moves by half steps.",
   },
   {
     label: "Whole Tone",
@@ -431,8 +410,7 @@ const cadenceDefinitions: CadenceDefinition[] = [
       [0, 4, 7],
       [7, 11, 14],
     ],
-    explanation:
-      "A half cadence ends on V. It sounds unfinished.",
+    explanation: "A half cadence ends on V. It sounds unfinished.",
   },
   {
     label: "Plagal",
@@ -468,12 +446,14 @@ export const defaultEarTrainingSettings: EarTrainingSettings = {
     referenceNote: "C4",
   },
   interval: {
+    playback: "ascending",
     ascending: true,
     descending: true,
     harmonic: true,
     enabledAnswers: intervalDefinitions.map((item) => item.label),
   },
   scale: {
+    playback: "ascending",
     ascending: true,
     descending: false,
     enabledAnswers: scaleDefinitions.map((item) => item.label),
@@ -493,7 +473,7 @@ function shuffle<T>(items: T[]) {
 }
 
 function noteToMidi(note: string) {
-  const match = note.match(/^([A-G])(#|b)?(\d)$/);
+  const match = note.match(/^([A-G])([#b]{0,2})(\d)$/);
 
   if (!match) {
     throw new Error(`Invalid note: ${note}`);
@@ -515,7 +495,9 @@ function noteToMidi(note: string) {
   let semitone = baseMap[letter];
 
   if (accidental === "#") semitone += 1;
+  if (accidental === "##") semitone += 2;
   if (accidental === "b") semitone -= 1;
+  if (accidental === "bb") semitone -= 2;
 
   return (octave + 1) * 12 + semitone;
 }
@@ -535,6 +517,108 @@ function transpose(note: string, semitones: number) {
   return midiToNote(noteToMidi(note) + semitones);
 }
 
+const intervalSemitonesByNumberQuality: Record<string, Record<string, number>> = {
+  "1": {
+    perfect: 0,
+  },
+  "2": {
+    diminished: 0,
+    minor: 1,
+    major: 2,
+    augmented: 3,
+  },
+  "3": {
+    diminished: 2,
+    minor: 3,
+    major: 4,
+    augmented: 5,
+  },
+  "4": {
+    diminished: 4,
+    perfect: 5,
+    augmented: 6,
+  },
+  "5": {
+    diminished: 6,
+    perfect: 7,
+    augmented: 8,
+  },
+  "6": {
+    diminished: 7,
+    minor: 8,
+    major: 9,
+    augmented: 10,
+  },
+  "7": {
+    diminished: 9,
+    minor: 10,
+    major: 11,
+    augmented: 12,
+  },
+  "8": {
+    diminished: 11,
+    perfect: 12,
+    augmented: 13,
+  },
+};
+
+const diatonicLetters = ["C", "D", "E", "F", "G", "A", "B"];
+
+function getIntervalSemitones(number: string, quality: string) {
+  return intervalSemitonesByNumberQuality[number]?.[quality];
+}
+
+function spellUpperIntervalNote(
+  rootNote: string,
+  number: string,
+  quality: string,
+) {
+  const semitones = getIntervalSemitones(number, quality);
+
+  if (semitones === undefined) {
+    return transpose(rootNote, 0);
+  }
+
+  const match = rootNote.match(/^([A-G])([#b]{0,2})(\d)$/);
+
+  if (!match) {
+    return transpose(rootNote, semitones);
+  }
+
+  const [, rootLetter, , rootOctaveString] = match;
+  const rootOctave = Number(rootOctaveString);
+  const rootIndex = diatonicLetters.indexOf(rootLetter);
+
+  if (rootIndex === -1) {
+    return transpose(rootNote, semitones);
+  }
+
+  const intervalNumber = Number(number);
+  const targetIndexTotal = rootIndex + intervalNumber - 1;
+  const targetLetter = diatonicLetters[targetIndexTotal % diatonicLetters.length];
+  const targetOctave =
+    rootOctave + Math.floor(targetIndexTotal / diatonicLetters.length);
+  const desiredMidi = noteToMidi(rootNote) + semitones;
+  const naturalMidi = noteToMidi(`${targetLetter}${targetOctave}`);
+  const accidentalDistance = desiredMidi - naturalMidi;
+
+  const accidentalMap: Record<number, string> = {
+    [-2]: "bb",
+    [-1]: "b",
+    0: "",
+    1: "#",
+    2: "##",
+  };
+
+  const accidental = accidentalMap[accidentalDistance];
+
+  if (accidental === undefined) {
+    return transpose(rootNote, semitones);
+  }
+
+  return `${targetLetter}${accidental}${targetOctave}`;
+}
+
 function getPreferredClefForNote(note: string, clefs: EarClef[]): EarClef {
   const midi = noteToMidi(note);
 
@@ -542,10 +626,18 @@ function getPreferredClefForNote(note: string, clefs: EarClef[]): EarClef {
 
   if (clefs.includes("bass") && midi <= noteToMidi("B3")) return "bass";
   if (clefs.includes("treble") && midi >= noteToMidi("C4")) return "treble";
-  if (clefs.includes("alto") && midi >= noteToMidi("C3") && midi <= noteToMidi("C5")) {
+  if (
+    clefs.includes("alto") &&
+    midi >= noteToMidi("C3") &&
+    midi <= noteToMidi("C5")
+  ) {
     return "alto";
   }
-  if (clefs.includes("tenor") && midi >= noteToMidi("G2") && midi <= noteToMidi("G4")) {
+  if (
+    clefs.includes("tenor") &&
+    midi >= noteToMidi("G2") &&
+    midi <= noteToMidi("G4")
+  ) {
     return "tenor";
   }
 
@@ -600,7 +692,7 @@ function getIntervalPrompt(style: EarPlaybackStyle) {
 }
 
 export function generatePitchQuestion(
-  settingsInput?: Partial<EarTrainingSettings>
+  settingsInput?: Partial<EarTrainingSettings>,
 ): EarTrainingQuestion {
   const settings = normalizeSettings(settingsInput);
   const pool = getNotesInRange(settings.range.low, settings.range.high);
@@ -614,7 +706,7 @@ export function generatePitchQuestion(
     return {
       id: `pitch-reference-${note}-${Date.now()}-${Math.random()}`,
       mode: "pitch",
-      title: "Pitch Reference",
+      title: `Pitch Reference (${noteWithoutOctave(referenceNote)})`,
       prompt: "Identify the second pitch after the reference note.",
       notes: [[referenceNote], [note]],
       playbackStyle: "reference",
@@ -644,7 +736,7 @@ export function generatePitchQuestion(
 }
 
 export function generateKeyboardQuestion(
-  settingsInput?: Partial<EarTrainingSettings>
+  settingsInput?: Partial<EarTrainingSettings>,
 ): EarTrainingQuestion {
   const settings = normalizeSettings(settingsInput);
   const pool = getNotesInRange(settings.range.low, settings.range.high);
@@ -669,43 +761,63 @@ export function generateKeyboardQuestion(
 }
 
 export function generateIntervalQuestion(
-  settingsInput?: Partial<EarTrainingSettings>
+  settingsInput?: Partial<EarTrainingSettings>,
 ): EarTrainingQuestion {
   const settings = normalizeSettings(settingsInput);
   const enabled = intervalDefinitions.filter((item) =>
-    settings.interval.enabledAnswers.includes(item.label)
+    settings.interval.enabledAnswers.includes(item.label),
   );
-  const interval = randomItem(enabled.length > 0 ? enabled : intervalDefinitions);
-
-  const possibleRoots = getNotesInRange(settings.range.low, settings.range.high).filter(
-    (note) => noteToMidi(note) + interval.semitones <= noteToMidi(settings.range.high)
+  const interval = randomItem(
+    enabled.length > 0 ? enabled : intervalDefinitions,
   );
 
-  const baseNote = randomItem(possibleRoots.length > 0 ? possibleRoots : ["C4"]);
+  const possibleRoots = getNotesInRange(
+    settings.range.low,
+    settings.range.high,
+  ).filter(
+    (note) =>
+      noteToMidi(note) + interval.semitones <= noteToMidi(settings.range.high),
+  );
+
+  const baseNote = randomItem(
+    possibleRoots.length > 0 ? possibleRoots : ["C4"],
+  );
   const clef = getPreferredClefForNote(baseNote, settings.clefs);
-  const upperNote = transpose(baseNote, interval.semitones);
-
-  const allowedStyles = [
-    settings.interval.ascending ? "melodic-ascending" : null,
-    settings.interval.descending ? "melodic-descending" : null,
-    settings.interval.harmonic ? "harmonic" : null,
-  ].filter(Boolean) as EarPlaybackStyle[];
-
-  const fallbackIntervalStyles: EarPlaybackStyle[] = ["melodic-ascending"];
-
-  const style: EarPlaybackStyle = randomItem(
-    allowedStyles.length > 0 ? allowedStyles : fallbackIntervalStyles
+  const upperPlaybackNote = transpose(baseNote, interval.semitones);
+  const upperStaffNote = spellUpperIntervalNote(
+    baseNote,
+    interval.number,
+    interval.quality,
   );
+
+  const styleByPlayback: Record<
+    EarTrainingSettings["interval"]["playback"],
+    EarPlaybackStyle
+  > = {
+    ascending: "melodic-ascending",
+    descending: "melodic-descending",
+    harmonic: "harmonic",
+  };
+
+  const style: EarPlaybackStyle =
+    styleByPlayback[settings.interval.playback] ?? "melodic-ascending";
 
   let notes: string[][];
 
   if (style === "harmonic") {
-    notes = [[baseNote, upperNote]];
+    notes = [[baseNote, upperPlaybackNote]];
   } else if (style === "melodic-descending") {
-    notes = [[upperNote], [baseNote]];
+    notes = [[upperPlaybackNote], [baseNote]];
   } else {
-    notes = [[baseNote], [upperNote]];
+    notes = [[baseNote], [upperPlaybackNote]];
   }
+
+  const staffAnswerNotes =
+    style === "harmonic"
+      ? [[baseNote, upperStaffNote]]
+      : style === "melodic-descending"
+        ? [upperStaffNote, baseNote]
+        : [baseNote, upperStaffNote];
 
   return {
     id: `interval-${interval.label}-${baseNote}-${style}-${Date.now()}-${Math.random()}`,
@@ -718,42 +830,38 @@ export function generateIntervalQuestion(
     answer: interval.label,
     clef,
     rootNote: baseNote,
-    staffAnswerNotes: [baseNote, upperNote],
+    staffAnswerNotes,
     explanation: `${interval.explanation} This example started on ${noteWithoutOctave(
-      baseNote
+      baseNote,
     )}.`,
   };
 }
 
 export function generateScaleQuestion(
-  settingsInput?: Partial<EarTrainingSettings>
+  settingsInput?: Partial<EarTrainingSettings>,
 ): EarTrainingQuestion {
   const settings = normalizeSettings(settingsInput);
   const enabled = scaleDefinitions.filter((item) =>
-    settings.scale.enabledAnswers.includes(item.label)
+    settings.scale.enabledAnswers.includes(item.label),
   );
   const scale = randomItem(enabled.length > 0 ? enabled : scaleDefinitions);
 
-  const rootPool = getNotesInRange(settings.range.low, settings.range.high).filter(
-    (note) => noteToMidi(note) + 12 <= noteToMidi(settings.range.high)
-  );
+  const rootPool = getNotesInRange(
+    settings.range.low,
+    settings.range.high,
+  ).filter((note) => noteToMidi(note) + 12 <= noteToMidi(settings.range.high));
 
   const root = randomItem(rootPool.length > 0 ? rootPool : ["C4"]);
   const clef = getPreferredClefForNote(root, settings.clefs);
 
-  const scaleStyles: EarPlaybackStyle[] = [
-    "scale-ascending",
-    "scale-descending",
-  ];
-
   const style: EarPlaybackStyle =
-    settings.scale.ascending && settings.scale.descending
-      ? randomItem(scaleStyles)
-      : settings.scale.descending
-        ? "scale-descending"
-        : "scale-ascending";
+    settings.scale.playback === "descending"
+      ? "scale-descending"
+      : "scale-ascending";
 
-  const scaleNotes = scale.semitones.map((semitone) => transpose(root, semitone));
+  const scaleNotes = scale.semitones.map((semitone) =>
+    transpose(root, semitone),
+  );
   const playbackNotes =
     style === "scale-descending" ? [...scaleNotes].reverse() : scaleNotes;
 
@@ -774,22 +882,28 @@ export function generateScaleQuestion(
 }
 
 export function generateChordQuestion(
-  settingsInput?: Partial<EarTrainingSettings>
+  settingsInput?: Partial<EarTrainingSettings>,
 ): EarTrainingQuestion {
   const settings = normalizeSettings(settingsInput);
   const enabled = chordDefinitions.filter((item) =>
-    settings.chord.enabledAnswers.includes(item.label)
+    settings.chord.enabledAnswers.includes(item.label),
   );
   const chord = randomItem(enabled.length > 0 ? enabled : chordDefinitions);
 
-  const rootPool = getNotesInRange(settings.range.low, settings.range.high).filter(
+  const rootPool = getNotesInRange(
+    settings.range.low,
+    settings.range.high,
+  ).filter(
     (note) =>
-      noteToMidi(note) + Math.max(...chord.semitones) <= noteToMidi(settings.range.high)
+      noteToMidi(note) + Math.max(...chord.semitones) <=
+      noteToMidi(settings.range.high),
   );
 
   const root = randomItem(rootPool.length > 0 ? rootPool : ["C4"]);
   const clef = getPreferredClefForNote(root, settings.clefs);
-  const chordNotes = chord.semitones.map((semitone) => transpose(root, semitone));
+  const chordNotes = chord.semitones.map((semitone) =>
+    transpose(root, semitone),
+  );
 
   const playbackStyle: EarPlaybackStyle =
     settings.chord.playback === "arpeggiated" ? "arpeggiated" : "blocked";
@@ -812,7 +926,7 @@ export function generateChordQuestion(
     rootNote: root,
     staffAnswerNotes: chordNotes,
     explanation: `${chord.explanation} This chord was built from ${noteWithoutOctave(
-      root
+      root,
     )}.`,
   };
 }
@@ -823,7 +937,7 @@ export function generateCadenceQuestion(): EarTrainingQuestion {
   const cadence = randomItem(cadenceDefinitions);
 
   const notes = cadence.chords.map((chord) =>
-    chord.map((semitone) => midiToNote(tonicMidi + semitone))
+    chord.map((semitone) => midiToNote(tonicMidi + semitone)),
   );
 
   return {
@@ -844,7 +958,7 @@ export function generateCadenceQuestion(): EarTrainingQuestion {
 
 export function getRandomEarTrainingQuestion(
   mode: EarTrainingMode,
-  settings?: Partial<EarTrainingSettings>
+  settings?: Partial<EarTrainingSettings>,
 ) {
   if (mode === "pitch") return generatePitchQuestion(settings);
   if (mode === "keyboard") return generateKeyboardQuestion(settings);
@@ -856,71 +970,36 @@ export function getRandomEarTrainingQuestion(
 
 export function getEarTrainingQuestions(
   mode: EarTrainingMode,
-  settings?: Partial<EarTrainingSettings>
+  settings?: Partial<EarTrainingSettings>,
 ) {
   return Array.from({ length: 20 }, () =>
-    getRandomEarTrainingQuestion(mode, settings)
+    getRandomEarTrainingQuestion(mode, settings),
   );
 }
 
 export function getIntervalStaffNotesFromSelection(
   rootNote: string,
   quality: string,
-  number: string
+  number: string,
+  playbackStyle: EarPlaybackStyle = "melodic-ascending",
 ) {
-  const intervalToSemitones: Record<string, Record<string, number>> = {
-    "1": {
-      perfect: 0,
-      augmented: 1,
-    },
-    "2": {
-      diminished: 0,
-      minor: 1,
-      major: 2,
-      augmented: 3,
-    },
-    "3": {
-      diminished: 2,
-      minor: 3,
-      major: 4,
-      augmented: 5,
-    },
-    "4": {
-      diminished: 4,
-      perfect: 5,
-      augmented: 6,
-    },
-    "5": {
-      diminished: 6,
-      perfect: 7,
-      augmented: 8,
-    },
-    "6": {
-      diminished: 7,
-      minor: 8,
-      major: 9,
-      augmented: 10,
-    },
-    "7": {
-      diminished: 9,
-      minor: 10,
-      major: 11,
-      augmented: 12,
-    },
-    "8": {
-      diminished: 11,
-      perfect: 12,
-      augmented: 13,
-    },
-  };
-
-  const semitones = intervalToSemitones[number]?.[quality];
+  const semitones = getIntervalSemitones(number, quality);
 
   if (semitones === undefined) {
     return [rootNote];
   }
 
-  return [rootNote, transpose(rootNote, semitones)];
+  const upperNote = spellUpperIntervalNote(rootNote, number, quality);
+
+  if (playbackStyle === "harmonic") {
+    return [[rootNote, upperNote]];
+  }
+
+  if (playbackStyle === "melodic-descending") {
+    return [upperNote, rootNote];
+  }
+
+  return [rootNote, upperNote];
 }
 
 export const earTrainingOptionLists = {

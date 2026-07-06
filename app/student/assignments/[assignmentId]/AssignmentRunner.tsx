@@ -505,7 +505,7 @@ export default function AssignmentRunner({
                     notes={currentQuestion.question.staffAnswerNotes}
                     clef={currentQuestion.question.clef ?? "treble"}
                     width={360}
-                    height={125}
+                    height={150}
                   />
                 </div>
               )}
