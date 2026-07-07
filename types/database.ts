@@ -34,6 +34,7 @@ export type Assignment = {
   mode: string;
   question_count: number;
   due_date: string | null;
+  settings_json: unknown | null;
   created_at: string;
 };
 

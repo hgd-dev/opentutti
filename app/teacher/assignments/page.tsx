@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import {
+  defaultEarTrainingSettings,
+  earTrainingOptionLists,
+  EarTrainingSettings,
+} from "@/lib/music/earTraining";
+import {
+  defaultTheorySettings,
+  theoryOptionLists,
+  TheorySettings,
+} from "@/lib/music/theoryTraining";
 import type {
   Assignment,
   AssignmentType,
@@ -18,32 +28,34 @@ const assignmentTypes: {
   {
     value: "ear_training",
     label: "Ear Training",
-    description: "Intervals, chords, and cadences.",
+    description: "Pitch, intervals, scales, chords, and cadences.",
   },
   {
     value: "theory",
     label: "Theory Tester",
-    description: "Notes, keys, intervals, triads, Roman numerals, and rhythm.",
+    description:
+      "Staff-based pitch, intervals, scales, chords, cadences, and key signatures.",
   },
 ];
 
-const modesByType: Record<AssignmentType, { value: string; label: string }[]> = {
-  ear_training: [
-    { value: "pitch", label: "Pitch" },
-    { value: "interval", label: "Intervals" },
-    { value: "scale", label: "Scales" },
-    { value: "chord", label: "Chords" },
-    { value: "cadence", label: "Cadences" },
-  ],
-  theory: [
-    { value: "notes", label: "Notes" },
-    { value: "keys", label: "Key Signatures" },
-    { value: "intervals", label: "Written Intervals" },
-    { value: "triads", label: "Triads" },
-    { value: "roman", label: "Roman Numerals" },
-    { value: "rhythm", label: "Rhythm" },
-  ],
-};
+const modesByType: Record<AssignmentType, { value: string; label: string }[]> =
+  {
+    ear_training: [
+      { value: "pitch", label: "Pitch" },
+      { value: "interval", label: "Intervals" },
+      { value: "scale", label: "Scales" },
+      { value: "chord", label: "Chords" },
+      { value: "cadence", label: "Cadences" },
+    ],
+    theory: [
+      { value: "pitch", label: "Pitch" },
+      { value: "interval", label: "Intervals" },
+      { value: "scale", label: "Scales" },
+      { value: "chord", label: "Chords" },
+      { value: "cadence", label: "Cadences" },
+      { value: "key-signature", label: "Key Signatures" },
+    ],
+  };
 
 type AssignmentWithClass = Assignment & {
   classes?: ClassRecord | ClassRecord[] | null;
@@ -73,6 +85,12 @@ export default function TeacherAssignmentsPage() {
   const [mode, setMode] = useState("interval");
   const [questionCount, setQuestionCount] = useState(10);
   const [dueDate, setDueDate] = useState("");
+  const [earSettings, setEarSettings] = useState<EarTrainingSettings>(
+    defaultEarTrainingSettings,
+  );
+  const [theorySettings, setTheorySettings] = useState<TheorySettings>(
+    defaultTheorySettings,
+  );
 
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -80,7 +98,7 @@ export default function TeacherAssignmentsPage() {
 
   const modeOptions = useMemo(
     () => modesByType[assignmentType],
-    [assignmentType]
+    [assignmentType],
   );
 
   function getClassName(assignment: AssignmentWithClass) {
@@ -102,6 +120,121 @@ export default function TeacherAssignmentsPage() {
     );
   }
 
+  function getCurrentAssignmentSettings() {
+    return assignmentType === "ear_training" ? earSettings : theorySettings;
+  }
+
+  function toggleArrayValue(
+    current: string[],
+    value: string,
+    fallback: string[],
+  ) {
+    const next = current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value];
+    return next.length > 0 ? next : fallback;
+  }
+
+  function toggleEarClef(clef: EarTrainingSettings["clefs"][number]) {
+    setEarSettings((current) => ({
+      ...current,
+      clefs: current.clefs.includes(clef)
+        ? current.clefs.filter((item) => item !== clef)
+        : [...current.clefs, clef],
+    }));
+  }
+
+  function toggleTheoryClef(clef: TheorySettings["clefs"][number]) {
+    setTheorySettings((current) => ({
+      ...current,
+      clefs: current.clefs.includes(clef)
+        ? current.clefs.filter((item) => item !== clef)
+        : [...current.clefs, clef],
+    }));
+  }
+
+  function setGroupedEarScale(groupItems: readonly string[], checked: boolean) {
+    setEarSettings((current) => {
+      const next = checked
+        ? Array.from(new Set([...current.scale.enabledAnswers, ...groupItems]))
+        : current.scale.enabledAnswers.filter(
+            (item) => !groupItems.includes(item),
+          );
+      return {
+        ...current,
+        scale: {
+          ...current.scale,
+          enabledAnswers:
+            next.length > 0 ? next : [...earTrainingOptionLists.scales],
+        },
+      };
+    });
+  }
+
+  function setGroupedTheoryScale(
+    groupItems: readonly string[],
+    checked: boolean,
+  ) {
+    setTheorySettings((current) => {
+      const next = checked
+        ? Array.from(new Set([...current.scale.enabledAnswers, ...groupItems]))
+        : current.scale.enabledAnswers.filter(
+            (item) => !groupItems.includes(item),
+          );
+      return {
+        ...current,
+        scale: {
+          ...current.scale,
+          enabledAnswers:
+            next.length > 0
+              ? next
+              : [...defaultTheorySettings.scale.enabledAnswers],
+        },
+      };
+    });
+  }
+
+  function setGroupedEarChord(groupItems: readonly string[], checked: boolean) {
+    setEarSettings((current) => {
+      const next = checked
+        ? Array.from(new Set([...current.chord.enabledAnswers, ...groupItems]))
+        : current.chord.enabledAnswers.filter(
+            (item) => !groupItems.includes(item),
+          );
+      return {
+        ...current,
+        chord: {
+          ...current.chord,
+          enabledAnswers:
+            next.length > 0 ? next : [...earTrainingOptionLists.chords],
+        },
+      };
+    });
+  }
+
+  function setGroupedTheoryChord(
+    groupItems: readonly string[],
+    checked: boolean,
+  ) {
+    setTheorySettings((current) => {
+      const next = checked
+        ? Array.from(new Set([...current.chord.enabledAnswers, ...groupItems]))
+        : current.chord.enabledAnswers.filter(
+            (item) => !groupItems.includes(item),
+          );
+      return {
+        ...current,
+        chord: {
+          ...current.chord,
+          enabledAnswers:
+            next.length > 0
+              ? next
+              : [...defaultTheorySettings.chord.enabledAnswers],
+        },
+      };
+    });
+  }
+
   function getAverageScore(results: RosterResult[]) {
     const completed = results.filter((result) => result.attempt);
 
@@ -109,7 +242,7 @@ export default function TeacherAssignmentsPage() {
 
     const total = completed.reduce(
       (sum, result) => sum + Number(result.attempt?.score ?? 0),
-      0
+      0,
     );
 
     return Math.round(total / completed.length);
@@ -170,7 +303,8 @@ export default function TeacherAssignmentsPage() {
       return;
     }
 
-    const loadedAssignments = (assignmentData ?? []) as unknown as AssignmentWithClass[];
+    const loadedAssignments = (assignmentData ??
+      []) as unknown as AssignmentWithClass[];
     setAssignments(loadedAssignments);
 
     if (loadedAssignments.length > 0) {
@@ -234,7 +368,7 @@ export default function TeacherAssignmentsPage() {
       student,
       attempt:
         (attemptsData ?? []).find(
-          (attempt) => attempt.student_id === student.id
+          (attempt) => attempt.student_id === student.id,
         ) ?? null,
     }));
 
@@ -259,7 +393,7 @@ export default function TeacherAssignmentsPage() {
       title.trim() ||
       `${getAssignmentTypeLabel(assignmentType)}: ${getModeLabel(
         assignmentType,
-        mode
+        mode,
       )}`;
 
     const { data, error } = await supabase
@@ -272,6 +406,7 @@ export default function TeacherAssignmentsPage() {
         mode,
         question_count: questionCount,
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
+        settings_json: getCurrentAssignmentSettings(),
       })
       .select("*, classes(*)")
       .single();
@@ -304,7 +439,9 @@ export default function TeacherAssignmentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const completedCount = rosterResults.filter((result) => result.attempt).length;
+  const completedCount = rosterResults.filter(
+    (result) => result.attempt,
+  ).length;
   const averageScore = getAverageScore(rosterResults);
 
   if (loading) {
@@ -401,9 +538,7 @@ export default function TeacherAssignmentsPage() {
                 </label>
 
                 <label className="mt-5 block">
-                  <span className="text-sm text-zinc-400">
-                    Assignment type
-                  </span>
+                  <span className="text-sm text-zinc-400">Assignment type</span>
                   <select
                     value={assignmentType}
                     onChange={(event) =>
@@ -433,6 +568,493 @@ export default function TeacherAssignmentsPage() {
                     ))}
                   </select>
                 </label>
+                <details className="mt-5 rounded-2xl border border-white/10 bg-zinc-950 p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-white">
+                    Exercise settings
+                  </summary>
+
+                  <div className="mt-4 space-y-4 text-sm text-zinc-300">
+                    {assignmentType === "ear_training" ? (
+                      <>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                            Clefs
+                          </p>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            {earTrainingOptionLists.clefs.map((clef) => (
+                              <label
+                                key={clef}
+                                className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={earSettings.clefs.includes(clef)}
+                                  onChange={() => toggleEarClef(clef)}
+                                />
+                                {clef}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="text-xs text-zinc-400">
+                            Low
+                            <select
+                              value={earSettings.range.low}
+                              onChange={(event) =>
+                                setEarSettings((current) => ({
+                                  ...current,
+                                  range: {
+                                    ...current.range,
+                                    low: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                            >
+                              {earTrainingOptionLists.rangeNotes.map((note) => (
+                                <option key={note} value={note}>
+                                  {note}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="text-xs text-zinc-400">
+                            High
+                            <select
+                              value={earSettings.range.high}
+                              onChange={(event) =>
+                                setEarSettings((current) => ({
+                                  ...current,
+                                  range: {
+                                    ...current.range,
+                                    high: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                            >
+                              {earTrainingOptionLists.rangeNotes.map((note) => (
+                                <option key={note} value={note}>
+                                  {note}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+
+                        {mode === "pitch" && (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <label className="text-xs text-zinc-400">
+                              Pitch mode
+                              <select
+                                value={earSettings.pitch.submode}
+                                onChange={(event) =>
+                                  setEarSettings((current) => ({
+                                    ...current,
+                                    pitch: {
+                                      ...current.pitch,
+                                      submode: event.target
+                                        .value as EarTrainingSettings["pitch"]["submode"],
+                                    },
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                              >
+                                <option value="perfect">Pitch Perfect</option>
+                                <option value="reference">
+                                  Pitch Reference (C)
+                                </option>
+                              </select>
+                            </label>
+                            <label className="text-xs text-zinc-400">
+                              Answer format
+                              <select
+                                value={earSettings.pitch.answerMode}
+                                onChange={(event) =>
+                                  setEarSettings((current) => ({
+                                    ...current,
+                                    pitch: {
+                                      ...current.pitch,
+                                      answerMode: event.target
+                                        .value as EarTrainingSettings["pitch"]["answerMode"],
+                                    },
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                              >
+                                <option value="choice">Choice buttons</option>
+                                <option value="keyboard">Keyboard</option>
+                              </select>
+                            </label>
+                          </div>
+                        )}
+
+                        {mode === "interval" && (
+                          <label className="text-xs text-zinc-400">
+                            Playback type
+                            <select
+                              value={earSettings.interval.playback}
+                              onChange={(event) =>
+                                setEarSettings((current) => ({
+                                  ...current,
+                                  interval: {
+                                    ...current.interval,
+                                    playback: event.target
+                                      .value as EarTrainingSettings["interval"]["playback"],
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                            >
+                              <option value="ascending">Ascending</option>
+                              <option value="descending">Descending</option>
+                              <option value="harmonic">Harmonic</option>
+                            </select>
+                          </label>
+                        )}
+
+                        {mode === "scale" && (
+                          <div className="space-y-3">
+                            <label className="text-xs text-zinc-400">
+                              Playback type
+                              <select
+                                value={earSettings.scale.playback}
+                                onChange={(event) =>
+                                  setEarSettings((current) => ({
+                                    ...current,
+                                    scale: {
+                                      ...current.scale,
+                                      playback: event.target
+                                        .value as EarTrainingSettings["scale"]["playback"],
+                                    },
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                              >
+                                <option value="ascending">Ascending</option>
+                                <option value="descending">Descending</option>
+                              </select>
+                            </label>
+                            {(
+                              Object.entries(
+                                earTrainingOptionLists.scaleGroups,
+                              ) as [string, string[]][]
+                            ).map(([group, items]) => (
+                              <label
+                                key={group}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={items.every((item) =>
+                                    earSettings.scale.enabledAnswers.includes(
+                                      item,
+                                    ),
+                                  )}
+                                  onChange={(event) =>
+                                    setGroupedEarScale(
+                                      items,
+                                      event.target.checked,
+                                    )
+                                  }
+                                />
+                                {group === "common"
+                                  ? "Common scales"
+                                  : group === "special"
+                                    ? "Special scales"
+                                    : "Modes"}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+
+                        {mode === "chord" && (
+                          <div className="space-y-3">
+                            <label className="text-xs text-zinc-400">
+                              Playback type
+                              <select
+                                value={earSettings.chord.playback}
+                                onChange={(event) =>
+                                  setEarSettings((current) => ({
+                                    ...current,
+                                    chord: {
+                                      ...current.chord,
+                                      playback: event.target
+                                        .value as EarTrainingSettings["chord"]["playback"],
+                                    },
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                              >
+                                <option value="blocked">Blocked</option>
+                                <option value="arpeggiated">Arpeggiated</option>
+                              </select>
+                            </label>
+                            <label className="flex items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={earSettings.chord.includeInversions}
+                                onChange={(event) =>
+                                  setEarSettings((current) => ({
+                                    ...current,
+                                    chord: {
+                                      ...current.chord,
+                                      includeInversions: event.target.checked,
+                                    },
+                                  }))
+                                }
+                              />{" "}
+                              Include inversions
+                            </label>
+                            {(
+                              Object.entries(
+                                earTrainingOptionLists.chordGroups,
+                              ) as [string, readonly string[]][]
+                            ).map(([group, items]) => (
+                              <label
+                                key={group}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={items.every((item) =>
+                                    earSettings.chord.enabledAnswers.includes(
+                                      item,
+                                    ),
+                                  )}
+                                  onChange={(event) =>
+                                    setGroupedEarChord(
+                                      items,
+                                      event.target.checked,
+                                    )
+                                  }
+                                />
+                                {group === "triads" ? "Triads" : "7th chords"}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
+                            Clefs
+                          </p>
+                          <div className="mt-2 grid grid-cols-2 gap-2">
+                            {theoryOptionLists.clefs.map((clef) => (
+                              <label
+                                key={clef}
+                                className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={theorySettings.clefs.includes(clef)}
+                                  onChange={() => toggleTheoryClef(clef)}
+                                />
+                                {clef}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {mode === "pitch" && (
+                          <label className="text-xs text-zinc-400">
+                            Answer format
+                            <select
+                              value={theorySettings.pitch.answerMode}
+                              onChange={(event) =>
+                                setTheorySettings((current) => ({
+                                  ...current,
+                                  pitch: {
+                                    ...current.pitch,
+                                    answerMode: event.target
+                                      .value as TheorySettings["pitch"]["answerMode"],
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                            >
+                              <option value="choices">Choice buttons</option>
+                              <option value="keyboard">Keyboard</option>
+                            </select>
+                          </label>
+                        )}
+
+                        {mode === "interval" && (
+                          <label className="text-xs text-zinc-400">
+                            Display type
+                            <select
+                              value={theorySettings.interval.playbackType}
+                              onChange={(event) =>
+                                setTheorySettings((current) => ({
+                                  ...current,
+                                  interval: {
+                                    ...current.interval,
+                                    playbackType: event.target
+                                      .value as TheorySettings["interval"]["playbackType"],
+                                  },
+                                }))
+                              }
+                              className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                            >
+                              <option value="ascending">Ascending</option>
+                              <option value="descending">Descending</option>
+                              <option value="harmonic">Harmonic</option>
+                            </select>
+                          </label>
+                        )}
+
+                        {mode === "scale" && (
+                          <div className="space-y-3">
+                            <label className="text-xs text-zinc-400">
+                              Display type
+                              <select
+                                value={theorySettings.scale.playbackType}
+                                onChange={(event) =>
+                                  setTheorySettings((current) => ({
+                                    ...current,
+                                    scale: {
+                                      ...current.scale,
+                                      playbackType: event.target
+                                        .value as TheorySettings["scale"]["playbackType"],
+                                    },
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                              >
+                                <option value="ascending">Ascending</option>
+                                <option value="descending">Descending</option>
+                              </select>
+                            </label>
+                            {(
+                              Object.entries(theoryOptionLists.scaleGroups) as [
+                                string,
+                                string[],
+                              ][]
+                            ).map(([group, items]) => (
+                              <label
+                                key={group}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={items.every((item) =>
+                                    theorySettings.scale.enabledAnswers.includes(
+                                      item,
+                                    ),
+                                  )}
+                                  onChange={(event) =>
+                                    setGroupedTheoryScale(
+                                      items,
+                                      event.target.checked,
+                                    )
+                                  }
+                                />
+                                {group === "common"
+                                  ? "Common scales"
+                                  : group === "special"
+                                    ? "Special scales"
+                                    : "Modes"}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+
+                        {mode === "chord" && (
+                          <div className="space-y-3">
+                            <label className="text-xs text-zinc-400">
+                              Display type
+                              <select
+                                value={theorySettings.chord.playbackType}
+                                onChange={(event) =>
+                                  setTheorySettings((current) => ({
+                                    ...current,
+                                    chord: {
+                                      ...current.chord,
+                                      playbackType: event.target
+                                        .value as TheorySettings["chord"]["playbackType"],
+                                    },
+                                  }))
+                                }
+                                className="mt-1 w-full rounded-xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                              >
+                                <option value="blocked">Blocked</option>
+                                <option value="arpeggiated">Arpeggiated</option>
+                              </select>
+                            </label>
+                            <label className="flex items-center gap-2 text-xs">
+                              <input
+                                type="checkbox"
+                                checked={theorySettings.chord.includeInversions}
+                                onChange={(event) =>
+                                  setTheorySettings((current) => ({
+                                    ...current,
+                                    chord: {
+                                      ...current.chord,
+                                      includeInversions: event.target.checked,
+                                    },
+                                  }))
+                                }
+                              />{" "}
+                              Include inversions
+                            </label>
+                            {(
+                              Object.entries(theoryOptionLists.chordGroups) as [
+                                string,
+                                string[],
+                              ][]
+                            ).map(([group, items]) => (
+                              <label
+                                key={group}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={items.every((item) =>
+                                    theorySettings.chord.enabledAnswers.includes(
+                                      item,
+                                    ),
+                                  )}
+                                  onChange={(event) =>
+                                    setGroupedTheoryChord(
+                                      items,
+                                      event.target.checked,
+                                    )
+                                  }
+                                />
+                                {group === "triads" ? "Triads" : "7th chords"}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+
+                        {mode === "key-signature" && (
+                          <label className="flex items-center gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={
+                                theorySettings.keySignature.includeRelativeMinor
+                              }
+                              onChange={(event) =>
+                                setTheorySettings((current) => ({
+                                  ...current,
+                                  keySignature: {
+                                    ...current.keySignature,
+                                    includeRelativeMinor: event.target.checked,
+                                  },
+                                }))
+                              }
+                            />{" "}
+                            Include relative major/minor questions
+                          </label>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </details>
 
                 <label className="mt-5 block">
                   <span className="text-sm text-zinc-400">
@@ -492,9 +1114,7 @@ export default function TeacherAssignmentsPage() {
                         : "border-white/10 bg-white/[0.02] hover:bg-white/[0.06]"
                     }`}
                   >
-                    <p className="font-medium text-white">
-                      {assignment.title}
-                    </p>
+                    <p className="font-medium text-white">{assignment.title}</p>
                     <p className="mt-1 text-sm leading-6 text-zinc-400">
                       {getClassName(assignment)} ·{" "}
                       {getAssignmentTypeLabel(assignment.assignment_type)}
@@ -511,21 +1131,17 @@ export default function TeacherAssignmentsPage() {
             <>
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-violet-300">
-                    RESULTS
-                  </p>
+                  <p className="text-sm font-medium text-violet-300">RESULTS</p>
                   <h2 className="mt-3 text-3xl font-semibold tracking-tight">
                     {selectedAssignment.title}
                   </h2>
                   <p className="mt-3 text-sm leading-6 text-zinc-400">
                     {getClassName(selectedAssignment)} ·{" "}
-                    {getAssignmentTypeLabel(
-                      selectedAssignment.assignment_type
-                    )}{" "}
+                    {getAssignmentTypeLabel(selectedAssignment.assignment_type)}{" "}
                     ·{" "}
                     {getModeLabel(
                       selectedAssignment.assignment_type,
-                      selectedAssignment.mode
+                      selectedAssignment.mode,
                     )}{" "}
                     · {selectedAssignment.question_count} questions
                   </p>
@@ -559,7 +1175,7 @@ export default function TeacherAssignmentsPage() {
                   <p className="mt-2 text-2xl font-semibold text-white">
                     {selectedAssignment.due_date
                       ? new Date(
-                          selectedAssignment.due_date
+                          selectedAssignment.due_date,
                         ).toLocaleDateString()
                       : "None"}
                   </p>
@@ -621,7 +1237,7 @@ export default function TeacherAssignmentsPage() {
                             <td className="px-4 py-3">
                               {result.attempt
                                 ? new Date(
-                                    result.attempt.completed_at
+                                    result.attempt.completed_at,
                                   ).toLocaleString()
                                 : "—"}
                             </td>

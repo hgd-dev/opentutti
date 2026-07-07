@@ -8,12 +8,14 @@ import { createClient } from "@/lib/supabase/client";
 import {
   EarTrainingMode,
   EarTrainingQuestion,
+  EarTrainingSettings,
   getRandomEarTrainingQuestion,
 } from "@/lib/music/earTraining";
 import {
   getRandomTheoryQuestion,
   TheoryMode,
   TheoryQuestion,
+  TheorySettings,
 } from "@/lib/music/theoryTraining";
 import type { Assignment, Attempt, Profile } from "@/types/database";
 
@@ -35,7 +37,7 @@ type AnswerRecord = {
 };
 
 function generateAssignmentQuestions(
-  assignment: Assignment
+  assignment: Assignment,
 ): AssignmentQuestion[] {
   const questions: AssignmentQuestion[] = [];
 
@@ -44,13 +46,18 @@ function generateAssignmentQuestions(
       questions.push({
         kind: "ear_training",
         question: getRandomEarTrainingQuestion(
-          assignment.mode as EarTrainingMode
+          assignment.mode as EarTrainingMode,
+          (assignment.settings_json ?? undefined) as
+            Partial<EarTrainingSettings> | undefined,
         ),
       });
     } else {
       questions.push({
         kind: "theory",
-        question: getRandomTheoryQuestion(assignment.mode as TheoryMode),
+        question: getRandomTheoryQuestion(
+          assignment.mode as TheoryMode,
+          (assignment.settings_json ?? undefined) as TheorySettings | undefined,
+        ),
       });
     }
   }
@@ -97,9 +104,12 @@ async function playEarQuestion(question: EarTrainingQuestion) {
     synth.triggerAttackRelease(noteGroup, duration, now + index * spacing);
   });
 
-  setTimeout(() => {
-    synth.dispose();
-  }, Math.max(1800, question.notes.length * 900 + 1400));
+  setTimeout(
+    () => {
+      synth.dispose();
+    },
+    Math.max(1800, question.notes.length * 900 + 1400),
+  );
 }
 
 function getAssignmentTypeLabel(type: string) {
@@ -116,12 +126,7 @@ function getModeLabel(mode: string) {
     scale: "Scales",
     chord: "Chords",
     cadence: "Cadences",
-    notes: "Notes",
-    keys: "Key Signatures",
-    intervals: "Written Intervals",
-    triads: "Triads",
-    roman: "Roman Numerals",
-    rhythm: "Rhythm",
+    "key-signature": "Key Signatures",
   };
 
   return labels[mode] ?? mode;
@@ -141,6 +146,8 @@ export default function AssignmentRunner({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [answered, setAnswered] = useState(false);
+  const [chordInversionAnswer, setChordInversionAnswer] =
+    useState("Root position");
   const [answerRecords, setAnswerRecords] = useState<AnswerRecord[]>([]);
   const [finished, setFinished] = useState(false);
 
@@ -150,12 +157,34 @@ export default function AssignmentRunner({
 
   const currentQuestion = questions[currentIndex];
   const rawQuestion = currentQuestion?.question;
-  const isCorrect = selected === rawQuestion?.answer;
+  const expectedAnswer = getExpectedAnswer();
+  const isCorrect = selected === expectedAnswer;
 
   const correctCount = useMemo(
     () => answerRecords.filter((record) => record.correct).length,
-    [answerRecords]
+    [answerRecords],
   );
+
+  function formatChordAnswer(chord: string, inversion: string) {
+    return `${chord} — ${inversion}`;
+  }
+
+  function requiresChordInversion() {
+    return Boolean(
+      rawQuestion &&
+      rawQuestion.mode === "chord" &&
+      rawQuestion.prompt.toLowerCase().includes("inversion") &&
+      rawQuestion.chordInversion,
+    );
+  }
+
+  function getExpectedAnswer() {
+    if (rawQuestion && requiresChordInversion() && rawQuestion.chordInversion) {
+      return formatChordAnswer(rawQuestion.answer, rawQuestion.chordInversion);
+    }
+
+    return rawQuestion?.answer ?? "";
+  }
 
   const score = useMemo(() => {
     if (!assignment || assignment.question_count === 0) return 0;
@@ -230,7 +259,7 @@ export default function AssignmentRunner({
       {
         prompt: rawQuestion.prompt,
         selected: choice,
-        answer: rawQuestion.answer,
+        answer: getExpectedAnswer(),
         correct: choice === rawQuestion.answer,
       },
     ]);
@@ -265,7 +294,7 @@ export default function AssignmentRunner({
       },
       {
         onConflict: "assignment_id,student_id",
-      }
+      },
     );
 
     if (error) {
@@ -289,6 +318,8 @@ export default function AssignmentRunner({
     setCurrentIndex((current) => current + 1);
     setSelected(null);
     setAnswered(false);
+    setChordInversionAnswer("Root position");
+    setChordInversionAnswer("Root position");
   }
 
   function restartAssignment() {
@@ -298,6 +329,8 @@ export default function AssignmentRunner({
     setCurrentIndex(0);
     setSelected(null);
     setAnswered(false);
+    setChordInversionAnswer("Root position");
+    setChordInversionAnswer("Root position");
     setAnswerRecords([]);
     setFinished(false);
     setMessage(null);
@@ -455,17 +488,58 @@ export default function AssignmentRunner({
           )}
         </div>
 
+        {!isEarTraining && currentQuestion.kind === "theory" && (
+          <div className="mt-8 rounded-3xl border border-white/10 bg-zinc-950 p-5">
+            <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-zinc-500">
+              Staff question
+            </p>
+            <StaffChoice
+              notes={currentQuestion.question.staffNotes}
+              clef={currentQuestion.question.clef}
+              keySignature={currentQuestion.question.keySignature}
+              timeSignature={currentQuestion.question.timeSignature}
+              width={currentQuestion.question.mode === "scale" ? 720 : 420}
+              height={140}
+            />
+          </div>
+        )}
+
+        {requiresChordInversion() && (
+          <label className="mt-8 block max-w-xs text-sm font-medium text-zinc-300">
+            Inversion
+            <select
+              value={chordInversionAnswer}
+              onChange={(event) => setChordInversionAnswer(event.target.value)}
+              disabled={answered}
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-4 text-lg text-white"
+            >
+              {[
+                "Root position",
+                "1st inversion",
+                "2nd inversion",
+                "3rd inversion",
+              ].map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
           {rawQuestion.choices.map((choice) => {
-            const chosen = selected === choice;
+            const submittedChoice = requiresChordInversion()
+              ? formatChordAnswer(choice, chordInversionAnswer)
+              : choice;
+            const chosen = selected === submittedChoice || selected === choice;
             const correctChoice = answered && choice === rawQuestion.answer;
-            const wrongChoice =
-              answered && chosen && choice !== rawQuestion.answer;
+            const wrongChoice = answered && chosen && !correctChoice;
 
             return (
               <button
                 key={choice}
-                onClick={() => chooseAnswer(choice)}
+                onClick={() => chooseAnswer(submittedChoice)}
                 className={`rounded-2xl border p-5 text-left text-lg font-medium transition ${
                   correctChoice
                     ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
@@ -487,9 +561,7 @@ export default function AssignmentRunner({
                 isCorrect ? "text-emerald-300" : "text-red-300"
               }`}
             >
-              {isCorrect
-                ? "Correct."
-                : `Not quite. Answer: ${rawQuestion.answer}`}
+              {isCorrect ? "Correct." : `Not quite. Answer: ${expectedAnswer}`}
             </p>
 
             <p className="mt-3 leading-8 text-zinc-300">

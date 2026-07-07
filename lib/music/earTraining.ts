@@ -28,6 +28,7 @@ export type EarTrainingQuestion = {
   clef?: EarClef;
   rootNote?: string;
   staffAnswerNotes?: (string | string[])[];
+  chordInversion?: ChordInversion;
 };
 
 export type EarTrainingSettings = {
@@ -57,6 +58,7 @@ export type EarTrainingSettings = {
   chord: {
     playback: "blocked" | "arpeggiated";
     enabledAnswers: string[];
+    includeInversions: boolean;
   };
 };
 
@@ -71,8 +73,12 @@ type IntervalDefinition = {
 type ChordDefinition = {
   label: string;
   semitones: number[];
+  category: "triads" | "sevenths";
   explanation: string;
 };
+
+export type ChordInversion =
+  "Root position" | "1st inversion" | "2nd inversion" | "3rd inversion";
 
 type ScaleDefinition = {
   label: string;
@@ -220,93 +226,118 @@ const chordDefinitions: ChordDefinition[] = [
   {
     label: "Major Triad",
     semitones: [0, 4, 7],
+    category: "triads",
     explanation:
       "A major triad has a bright sound: root, major 3rd, perfect 5th.",
   },
   {
     label: "Minor Triad",
     semitones: [0, 3, 7],
+    category: "triads",
     explanation:
       "A minor triad has a darker sound: root, minor 3rd, perfect 5th.",
   },
   {
     label: "Diminished Triad",
     semitones: [0, 3, 6],
+    category: "triads",
     explanation:
       "A diminished triad sounds tense because of the diminished 5th.",
   },
   {
     label: "Augmented Triad",
     semitones: [0, 4, 8],
+    category: "triads",
     explanation:
       "An augmented triad sounds bright but unstable because of the raised 5th.",
   },
   {
-    label: "Suspended 2nd",
-    semitones: [0, 2, 7],
-    explanation: "A suspended 2nd replaces the 3rd of the triad with the 2nd.",
-  },
-  {
-    label: "Suspended 4th",
-    semitones: [0, 5, 7],
-    explanation: "A suspended 4th replaces the 3rd of the triad with the 4th.",
-  },
-  {
     label: "Dominant 7th",
     semitones: [0, 4, 7, 10],
+    category: "sevenths",
     explanation:
       "A dominant 7th has a major triad plus a minor 7th. It wants to resolve.",
   },
   {
     label: "Major 7th",
     semitones: [0, 4, 7, 11],
+    category: "sevenths",
     explanation:
       "A major 7th has a major triad plus a major 7th. It sounds smooth but bright.",
   },
   {
     label: "Minor 7th",
     semitones: [0, 3, 7, 10],
+    category: "sevenths",
     explanation:
       "A minor 7th has a minor triad plus a minor 7th. It sounds darker and jazzy.",
   },
   {
     label: "Minor-major 7th",
     semitones: [0, 3, 7, 11],
+    category: "sevenths",
     explanation:
       "A minor-major 7th has a minor triad plus a major 7th. It sounds dark and tense.",
   },
   {
     label: "Half-diminished 7th",
     semitones: [0, 3, 6, 10],
+    category: "sevenths",
     explanation:
       "A half-diminished 7th is a diminished triad plus a minor 7th.",
   },
   {
     label: "Diminished 7th",
     semitones: [0, 3, 6, 9],
+    category: "sevenths",
     explanation: "A diminished 7th stacks minor thirds and sounds very tense.",
   },
   {
     label: "Augmented 7th",
     semitones: [0, 4, 8, 10],
+    category: "sevenths",
     explanation: "An augmented 7th has an augmented triad plus a minor 7th.",
   },
   {
     label: "Augmented-major 7th",
     semitones: [0, 4, 8, 11],
+    category: "sevenths",
     explanation:
       "An augmented-major 7th has an augmented triad plus a major 7th.",
   },
-  {
-    label: "Major 6th Chord",
-    semitones: [0, 4, 7, 9],
-    explanation: "A major 6th chord is a major triad with an added major 6th.",
-  },
-  {
-    label: "Minor 6th Chord",
-    semitones: [0, 3, 7, 9],
-    explanation: "A minor 6th chord is a minor triad with an added major 6th.",
-  },
+];
+
+export const scaleGroups = {
+  common: ["Major", "Natural Minor", "Harmonic Minor", "Melodic Minor"],
+  special: [
+    "Chromatic",
+    "Whole Tone",
+    "Major Pentatonic",
+    "Minor Pentatonic",
+    "Blues",
+  ],
+  modes: ["Dorian", "Phrygian", "Lydian", "Mixolydian", "Locrian"],
+} as const;
+
+export const chordGroups = {
+  triads: ["Major Triad", "Minor Triad", "Diminished Triad", "Augmented Triad"],
+  sevenths: [
+    "Dominant 7th",
+    "Major 7th",
+    "Minor 7th",
+    "Minor-major 7th",
+    "Half-diminished 7th",
+    "Diminished 7th",
+    "Augmented 7th",
+    "Augmented-major 7th",
+  ],
+} as const;
+
+export const chordInversions: ChordInversion[] = [
+  "Root position",
+  "1st inversion",
+  "2nd inversion",
+  "3rd inversion",
 ];
 
 const scaleDefinitions: ScaleDefinition[] = [
@@ -461,6 +492,7 @@ export const defaultEarTrainingSettings: EarTrainingSettings = {
   chord: {
     playback: "blocked",
     enabledAnswers: chordDefinitions.map((item) => item.label),
+    includeInversions: false,
   },
 };
 
@@ -517,7 +549,10 @@ function transpose(note: string, semitones: number) {
   return midiToNote(noteToMidi(note) + semitones);
 }
 
-const intervalSemitonesByNumberQuality: Record<string, Record<string, number>> = {
+const intervalSemitonesByNumberQuality: Record<
+  string,
+  Record<string, number>
+> = {
   "1": {
     perfect: 0,
   },
@@ -595,7 +630,8 @@ function spellUpperIntervalNote(
 
   const intervalNumber = Number(number);
   const targetIndexTotal = rootIndex + intervalNumber - 1;
-  const targetLetter = diatonicLetters[targetIndexTotal % diatonicLetters.length];
+  const targetLetter =
+    diatonicLetters[targetIndexTotal % diatonicLetters.length];
   const targetOctave =
     rootOctave + Math.floor(targetIndexTotal / diatonicLetters.length);
   const desiredMidi = noteToMidi(rootNote) + semitones;
@@ -881,6 +917,30 @@ export function generateScaleQuestion(
   };
 }
 
+function getAvailableInversions(chord: ChordDefinition): ChordInversion[] {
+  return chord.semitones.length >= 4
+    ? chordInversions
+    : chordInversions.filter((item) => item !== "3rd inversion");
+}
+
+function applyChordInversion(notes: string[], inversion: ChordInversion) {
+  const stepsByInversion: Record<ChordInversion, number> = {
+    "Root position": 0,
+    "1st inversion": 1,
+    "2nd inversion": 2,
+    "3rd inversion": 3,
+  };
+  const steps = Math.min(stepsByInversion[inversion] ?? 0, notes.length - 1);
+  const inverted = [...notes];
+
+  for (let i = 0; i < steps; i += 1) {
+    const moved = inverted.shift();
+    if (moved) inverted.push(transpose(moved, 12));
+  }
+
+  return inverted;
+}
+
 export function generateChordQuestion(
   settingsInput?: Partial<EarTrainingSettings>,
 ): EarTrainingQuestion {
@@ -889,21 +949,27 @@ export function generateChordQuestion(
     settings.chord.enabledAnswers.includes(item.label),
   );
   const chord = randomItem(enabled.length > 0 ? enabled : chordDefinitions);
+  const availableInversions = getAvailableInversions(chord);
+  const inversion = settings.chord.includeInversions
+    ? randomItem(availableInversions)
+    : "Root position";
 
+  const requiredSpan =
+    Math.max(...chord.semitones) + (inversion === "Root position" ? 0 : 12);
   const rootPool = getNotesInRange(
     settings.range.low,
     settings.range.high,
   ).filter(
     (note) =>
-      noteToMidi(note) + Math.max(...chord.semitones) <=
-      noteToMidi(settings.range.high),
+      noteToMidi(note) + requiredSpan <= noteToMidi(settings.range.high),
   );
 
-  const root = randomItem(rootPool.length > 0 ? rootPool : ["C4"]);
+  const root = randomItem(rootPool.length > 0 ? rootPool : ["C3"]);
   const clef = getPreferredClefForNote(root, settings.clefs);
-  const chordNotes = chord.semitones.map((semitone) =>
+  const rootPositionNotes = chord.semitones.map((semitone) =>
     transpose(root, semitone),
   );
+  const chordNotes = applyChordInversion(rootPositionNotes, inversion);
 
   const playbackStyle: EarPlaybackStyle =
     settings.chord.playback === "arpeggiated" ? "arpeggiated" : "blocked";
@@ -913,11 +979,16 @@ export function generateChordQuestion(
       ? chordNotes.map((note) => [note])
       : [chordNotes];
 
+  const inversionText =
+    inversion === "Root position" ? "root position" : inversion.toLowerCase();
+
   return {
-    id: `chord-${chord.label}-${root}-${Date.now()}-${Math.random()}`,
+    id: `chord-${chord.label}-${root}-${inversion}-${Date.now()}-${Math.random()}`,
     mode: "chord",
     title: chord.label,
-    prompt: "Identify the chord quality.",
+    prompt: settings.chord.includeInversions
+      ? "Identify the chord quality and inversion."
+      : "Identify the chord quality.",
     notes,
     playbackStyle,
     choices: chordDefinitions.map((item) => item.label),
@@ -925,9 +996,10 @@ export function generateChordQuestion(
     clef,
     rootNote: root,
     staffAnswerNotes: chordNotes,
+    chordInversion: inversion,
     explanation: `${chord.explanation} This chord was built from ${noteWithoutOctave(
       root,
-    )}.`,
+    )} and shown in ${inversionText}.`,
   };
 }
 
@@ -1006,6 +1078,9 @@ export const earTrainingOptionLists = {
   intervals: intervalDefinitions.map((item) => item.label),
   scales: scaleDefinitions.map((item) => item.label),
   chords: chordDefinitions.map((item) => item.label),
+  scaleGroups,
+  chordGroups,
+  chordInversions,
   clefs: ["treble", "bass", "alto", "tenor"] as EarClef[],
   rangeNotes: [
     "C2",

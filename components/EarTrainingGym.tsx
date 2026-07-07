@@ -58,8 +58,7 @@ const modes: { value: EarTrainingMode; label: string; description: string }[] =
     {
       value: "chord",
       label: "Chords",
-      description:
-        "Identify triads, sevenths, suspended chords, and sixth chords.",
+      description: "Identify triads and 7th chords, with optional inversions.",
     },
     {
       value: "cadence",
@@ -353,10 +352,13 @@ export default function EarTrainingGym() {
 
   const [intervalQuality, setIntervalQuality] = useState("perfect");
   const [intervalNumber, setIntervalNumber] = useState("1");
+  const [chordInversionAnswer, setChordInversionAnswer] =
+    useState("Root position");
 
   const totalCount = records.length;
   const correctCount = records.filter((record) => record.correct).length;
-  const isCorrect = selected === question.answer;
+  const expectedAnswer = getExpectedAnswer();
+  const isCorrect = selected === expectedAnswer;
 
   const accuracy = useMemo(
     () => getAccuracy(correctCount, totalCount),
@@ -366,6 +368,26 @@ export default function EarTrainingGym() {
   const advice = useMemo(() => getAdvice(records), [records]);
 
   const effectivePitchSelectionMode = pitchSelectionMode;
+
+  function formatChordAnswer(chord: string, inversion: string) {
+    return `${chord} — ${inversion}`;
+  }
+
+  function getExpectedAnswer() {
+    if (
+      mode === "chord" &&
+      settings.chord.includeInversions &&
+      question.chordInversion
+    ) {
+      return formatChordAnswer(question.answer, question.chordInversion);
+    }
+
+    return question.answer;
+  }
+
+  function getShownAnswer() {
+    return getExpectedAnswer();
+  }
 
   function getCurrentSettings(
     nextPitchSubmode = pitchSubmode,
@@ -392,6 +414,7 @@ export default function EarTrainingGym() {
     setAnswered(false);
     setIntervalQuality("perfect");
     setIntervalNumber("1");
+    setChordInversionAnswer("Root position");
   }
 
   function changePitchSubmode(nextSubmode: PitchSubmode) {
@@ -412,7 +435,8 @@ export default function EarTrainingGym() {
   function submitAnswer(choice: string) {
     if (answered) return;
 
-    const correct = choice === question.answer;
+    const expected = getExpectedAnswer();
+    const correct = choice === expected;
 
     setSelected(choice);
     setAnswered(true);
@@ -431,7 +455,7 @@ export default function EarTrainingGym() {
         id: `${question.id}-${Date.now()}`,
         mode,
         prompt: question.prompt,
-        answer: question.answer,
+        answer: expected,
         selected: choice,
         correct,
         explanation: question.explanation,
@@ -452,6 +476,7 @@ export default function EarTrainingGym() {
     setAnswered(false);
     setIntervalQuality("perfect");
     setIntervalNumber("1");
+    setChordInversionAnswer("Root position");
   }
 
   function startNewSession() {
@@ -548,7 +573,9 @@ export default function EarTrainingGym() {
               };
 
               setSettings(nextSettings);
-              setQuestion(getRandomEarTrainingQuestion("interval", nextSettings));
+              setQuestion(
+                getRandomEarTrainingQuestion("interval", nextSettings),
+              );
               setSelected(null);
               setAnswered(false);
               setIntervalQuality("perfect");
@@ -722,22 +749,76 @@ export default function EarTrainingGym() {
             Scale types
           </summary>
 
-          <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
-            {earTrainingOptionLists.scales.map((item) => (
-              <label
-                key={item}
-                className="flex items-center gap-2 text-xs text-zinc-300"
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.scale.enabledAnswers.includes(item)}
-                  onChange={(event) =>
-                    toggleOption("scale", item, event.target.checked)
-                  }
-                />
-                {item}
-              </label>
-            ))}
+          <div className="mt-3 space-y-4">
+            {(
+              Object.entries(earTrainingOptionLists.scaleGroups) as [
+                string,
+                readonly string[],
+              ][]
+            ).map(([groupKey, groupItems]) => {
+              const label =
+                groupKey === "common"
+                  ? "Common"
+                  : groupKey === "special"
+                    ? "Special"
+                    : "Modes";
+              const allChecked = groupItems.every((item) =>
+                settings.scale.enabledAnswers.includes(item),
+              );
+              return (
+                <div
+                  key={groupKey}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+                >
+                  <label className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      onChange={(event) => {
+                        const nextAnswers = event.target.checked
+                          ? Array.from(
+                              new Set([
+                                ...settings.scale.enabledAnswers,
+                                ...groupItems,
+                              ]),
+                            )
+                          : settings.scale.enabledAnswers.filter(
+                              (item) => !groupItems.includes(item),
+                            );
+                        setSettings((current) => ({
+                          ...current,
+                          scale: {
+                            ...current.scale,
+                            enabledAnswers:
+                              nextAnswers.length > 0
+                                ? nextAnswers
+                                : [...earTrainingOptionLists.scales],
+                          },
+                        }));
+                      }}
+                    />
+                    {label}
+                  </label>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {groupItems.map((item) => (
+                      <label
+                        key={item}
+                        className="flex items-center gap-2 text-xs text-zinc-300"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={settings.scale.enabledAnswers.includes(item)}
+                          onChange={(event) =>
+                            toggleOption("scale", item, event.target.checked)
+                          }
+                        />
+                        {item}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </details>
       )}
@@ -745,25 +826,99 @@ export default function EarTrainingGym() {
       {mode === "chord" && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm text-zinc-300">
-            Chord types
+            Chord types and inversions
           </summary>
 
-          <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
-            {earTrainingOptionLists.chords.map((item) => (
-              <label
-                key={item}
-                className="flex items-center gap-2 text-xs text-zinc-300"
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.chord.enabledAnswers.includes(item)}
-                  onChange={(event) =>
-                    toggleOption("chord", item, event.target.checked)
-                  }
-                />
-                {item}
-              </label>
-            ))}
+          <div className="mt-3 space-y-4">
+            <label className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-xs text-zinc-300">
+              <input
+                type="checkbox"
+                checked={settings.chord.includeInversions}
+                onChange={(event) => {
+                  const nextSettings: EarTrainingSettings = {
+                    ...settings,
+                    chord: {
+                      ...settings.chord,
+                      includeInversions: event.target.checked,
+                    },
+                  };
+                  setSettings(nextSettings);
+                  if (mode === "chord")
+                    setQuestion(
+                      getRandomEarTrainingQuestion("chord", nextSettings),
+                    );
+                  setSelected(null);
+                  setAnswered(false);
+                  setChordInversionAnswer("Root position");
+                }}
+              />
+              Include inversions in questions and answers
+            </label>
+
+            {(
+              Object.entries(earTrainingOptionLists.chordGroups) as [
+                string,
+                readonly string[],
+              ][]
+            ).map(([groupKey, groupItems]) => {
+              const label = groupKey === "triads" ? "Triads" : "7th chords";
+              const allChecked = groupItems.every((item) =>
+                settings.chord.enabledAnswers.includes(item),
+              );
+              return (
+                <div
+                  key={groupKey}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-3"
+                >
+                  <label className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      onChange={(event) => {
+                        const nextAnswers = event.target.checked
+                          ? Array.from(
+                              new Set([
+                                ...settings.chord.enabledAnswers,
+                                ...groupItems,
+                              ]),
+                            )
+                          : settings.chord.enabledAnswers.filter(
+                              (item) => !groupItems.includes(item),
+                            );
+                        setSettings((current) => ({
+                          ...current,
+                          chord: {
+                            ...current.chord,
+                            enabledAnswers:
+                              nextAnswers.length > 0
+                                ? nextAnswers
+                                : [...earTrainingOptionLists.chords],
+                          },
+                        }));
+                      }}
+                    />
+                    {label}
+                  </label>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {groupItems.map((item) => (
+                      <label
+                        key={item}
+                        className="flex items-center gap-2 text-xs text-zinc-300"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={settings.chord.enabledAnswers.includes(item)}
+                          onChange={(event) =>
+                            toggleOption("chord", item, event.target.checked)
+                          }
+                        />
+                        {item}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </details>
       )}
@@ -1200,29 +1355,56 @@ export default function EarTrainingGym() {
           )}
 
           {(mode === "scale" || mode === "chord" || mode === "cadence") && (
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              {question.choices.map((choice) => {
-                const chosen = selected === choice;
-                const correctChoice = answered && choice === question.answer;
-                const wrongChoice =
-                  answered && chosen && choice !== question.answer;
-
-                return (
-                  <button
-                    key={choice}
-                    onClick={() => submitAnswer(choice)}
-                    className={`rounded-2xl border p-5 text-left text-lg font-medium transition ${
-                      correctChoice
-                        ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
-                        : wrongChoice
-                          ? "border-red-400/70 bg-red-500/15 text-red-100"
-                          : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
-                    }`}
+            <div className="mt-8">
+              {mode === "chord" && settings.chord.includeInversions && (
+                <label className="mb-4 block max-w-xs text-sm text-zinc-300">
+                  Inversion
+                  <select
+                    value={chordInversionAnswer}
+                    onChange={(event) =>
+                      setChordInversionAnswer(event.target.value)
+                    }
+                    disabled={answered}
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-violet-400"
                   >
-                    {choice}
-                  </button>
-                );
-              })}
+                    {earTrainingOptionLists.chordInversions.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {question.choices.map((choice) => {
+                  const submittedChoice =
+                    mode === "chord" && settings.chord.includeInversions
+                      ? formatChordAnswer(choice, chordInversionAnswer)
+                      : choice;
+                  const chosen =
+                    selected === submittedChoice || selected === choice;
+                  const correctChoice = answered && choice === question.answer;
+                  const wrongChoice = answered && chosen && !correctChoice;
+
+                  return (
+                    <button
+                      key={choice}
+                      onClick={() => submitAnswer(submittedChoice)}
+                      disabled={answered}
+                      className={`rounded-2xl border p-5 text-left text-lg font-medium transition disabled:cursor-not-allowed ${
+                        correctChoice
+                          ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
+                          : wrongChoice
+                            ? "border-red-400/70 bg-red-500/15 text-red-100"
+                            : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      {choice}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -1235,7 +1417,7 @@ export default function EarTrainingGym() {
               >
                 {isCorrect
                   ? "Correct."
-                  : `Not quite. Answer: ${question.answer}`}
+                  : `Not quite. Answer: ${getShownAnswer()}`}
               </p>
 
               <p className="mt-3 leading-8 text-zinc-300">
