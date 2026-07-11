@@ -82,6 +82,42 @@ const chromaticChoices = [
   "B",
 ];
 
+const enharmonicFlatChoices = [
+  { note: "Db", slot: 1 },
+  { note: "Eb", slot: 3 },
+  { note: "Gb", slot: 6 },
+  { note: "Ab", slot: 8 },
+  { note: "Bb", slot: 10 },
+];
+
+const enharmonicPitchClassMap: Record<string, string> = {
+  Db: "C#",
+  Eb: "D#",
+  Gb: "F#",
+  Ab: "G#",
+  Bb: "A#",
+};
+
+const blackKeyLabels: Record<string, string> = {
+  "C#": "C#/Db",
+  "D#": "D#/Eb",
+  "F#": "F#/Gb",
+  "G#": "G#/Ab",
+  "A#": "A#/Bb",
+};
+
+function normalizePitchClassForEnharmonic(note: string) {
+  return enharmonicPitchClassMap[note] ?? note;
+}
+
+function isEnharmonicPitchMatch(selectedNote: string | null, answerNote: string) {
+  if (!selectedNote) return false;
+  return (
+    normalizePitchClassForEnharmonic(selectedNote) ===
+    normalizePitchClassForEnharmonic(answerNote)
+  );
+}
+
 const whiteKeys = ["C", "D", "E", "F", "G", "A", "B"];
 
 const blackKeys = [
@@ -258,7 +294,7 @@ function PianoKeyboard({
             }`}
             style={{ left: key.left }}
           >
-            {key.note}
+            {blackKeyLabels[key.note] ?? key.note}
           </button>
         ))}
       </div>
@@ -358,7 +394,10 @@ export default function EarTrainingGym() {
   const totalCount = records.length;
   const correctCount = records.filter((record) => record.correct).length;
   const expectedAnswer = getExpectedAnswer();
-  const isCorrect = selected === expectedAnswer;
+  const isCorrect =
+    mode === "pitch"
+      ? isEnharmonicPitchMatch(selected, expectedAnswer)
+      : selected === expectedAnswer;
 
   const accuracy = useMemo(
     () => getAccuracy(correctCount, totalCount),
@@ -436,7 +475,10 @@ export default function EarTrainingGym() {
     if (answered) return;
 
     const expected = getExpectedAnswer();
-    const correct = choice === expected;
+    const correct =
+      mode === "pitch"
+        ? isEnharmonicPitchMatch(choice, expected)
+        : choice === expected;
 
     setSelected(choice);
     setAnswered(true);
@@ -1236,30 +1278,58 @@ export default function EarTrainingGym() {
               )}
 
               {effectivePitchSelectionMode === "choice" ? (
-                <div className="flex flex-wrap gap-2">
-                  {chromaticChoices.map((choice) => {
-                    const chosen = selected === choice;
-                    const correctChoice =
-                      answered && choice === question.answer;
-                    const wrongChoice =
-                      answered && chosen && choice !== question.answer;
+                <div className="space-y-3">
+                  <div className="grid grid-cols-12 gap-2">
+                    {chromaticChoices.map((choice) => {
+                      const chosen = selected === choice;
+                      const correctChoice =
+                        answered && isEnharmonicPitchMatch(choice, question.answer);
+                      const wrongChoice =
+                        answered && chosen && !isEnharmonicPitchMatch(choice, question.answer);
 
-                    return (
-                      <button
-                        key={choice}
-                        onClick={() => submitAnswer(choice)}
-                        className={`rounded-2xl border px-4 py-3 text-base font-semibold transition ${
-                          correctChoice
-                            ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
-                            : wrongChoice
-                              ? "border-red-400/70 bg-red-500/15 text-red-100"
-                              : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
-                        }`}
-                      >
-                        {choice}
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={choice}
+                          onClick={() => submitAnswer(choice)}
+                          className={`w-full rounded-2xl border px-4 py-3 text-center text-base font-semibold transition ${
+                            correctChoice
+                              ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
+                              : wrongChoice
+                                ? "border-red-400/70 bg-red-500/15 text-red-100"
+                                : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
+                          }`}
+                        >
+                          {choice}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="grid grid-cols-12 gap-2 border-t border-white/10 pt-3">
+                    {enharmonicFlatChoices.map(({ note: choice, slot }) => {
+                      const chosen = selected === choice;
+                      const correctChoice =
+                        answered && isEnharmonicPitchMatch(choice, question.answer);
+                      const wrongChoice =
+                        answered && chosen && !isEnharmonicPitchMatch(choice, question.answer);
+
+                      return (
+                        <button
+                          key={choice}
+                          style={{ gridColumnStart: slot + 1 }}
+                          onClick={() => submitAnswer(choice)}
+                          className={`w-full rounded-2xl border px-4 py-3 text-center text-base font-semibold transition ${
+                            correctChoice
+                              ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
+                              : wrongChoice
+                                ? "border-red-400/70 bg-red-500/15 text-red-100"
+                                : "border-white/10 bg-zinc-950 hover:bg-white/[0.06]"
+                          }`}
+                        >
+                          {choice}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <PianoKeyboard selected={selected} onSelect={submitAnswer} />

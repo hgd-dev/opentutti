@@ -18,6 +18,7 @@ export type TheorySettings = {
   };
   pitch: {
     answerMode: TheoryAnswerMode;
+    allowEnharmonics: boolean;
   };
   interval: {
     playbackType: "ascending" | "descending" | "harmonic";
@@ -153,6 +154,7 @@ export const theoryOptionLists = {
     "A#",
     "B",
   ],
+  enharmonicPitchClasses: ["Db", "Eb", "Gb", "Ab", "Bb"],
   intervalNumbers: [
     { value: "1", label: "Unison / 1st" },
     { value: "2", label: "2nd" },
@@ -184,6 +186,7 @@ export const defaultTheorySettings: TheorySettings = {
   },
   pitch: {
     answerMode: "choices",
+    allowEnharmonics: false,
   },
   interval: {
     playbackType: "ascending",

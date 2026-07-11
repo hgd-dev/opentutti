@@ -108,6 +108,56 @@ const pitchButtonChoices = [
   "A#",
   "B",
 ];
+
+const enharmonicFlatChoices = [
+  { note: "Db", slot: 1 },
+  { note: "Eb", slot: 3 },
+  { note: "Gb", slot: 6 },
+  { note: "Ab", slot: 8 },
+  { note: "Bb", slot: 10 },
+];
+
+const enharmonicPitchClassMap: Record<string, string> = {
+  Db: "C#",
+  Eb: "D#",
+  Gb: "F#",
+  Ab: "G#",
+  Bb: "A#",
+};
+
+const blackKeyLabels: Record<string, string> = {
+  "C#": "C#/Db",
+  "D#": "D#/Eb",
+  "F#": "F#/Gb",
+  "G#": "G#/Ab",
+  "A#": "A#/Bb",
+};
+
+function normalizePitchClassForEnharmonic(note: string) {
+  return enharmonicPitchClassMap[note] ?? note;
+}
+
+function isEnharmonicPitchMatch(
+  selectedNote: string | null | undefined,
+  answerNote: string,
+  allowEnharmonics: boolean,
+) {
+  if (!selectedNote) return false;
+  if (selectedNote === answerNote) return true;
+  if (!allowEnharmonics) return false;
+
+  const selectedOctave = selectedNote.match(/\d+$/)?.[0] ?? "";
+  const answerOctave = answerNote.match(/\d+$/)?.[0] ?? "";
+
+  if (selectedOctave || answerOctave) {
+    if (selectedOctave !== answerOctave) return false;
+  }
+
+  return (
+    normalizePitchClassForEnharmonic(selectedNote.replace(/\d+$/, "")) ===
+    normalizePitchClassForEnharmonic(answerNote.replace(/\d+$/, ""))
+  );
+}
 const whitePitchClasses = ["C", "D", "E", "F", "G", "A", "B"];
 const blackPitchClasses = ["C#", "D#", "F#", "G#", "A#"];
 const naturalBeforeBlack: Record<string, string> = {
@@ -179,41 +229,80 @@ function PitchClassChoiceButtons({
   selected,
   answered,
   answer,
+  allowEnharmonics,
   onSelect,
 }: {
   selected: string | null;
   answered: boolean;
   answer: string;
+  allowEnharmonics: boolean;
   onSelect: (note: string) => void;
 }) {
   return (
     <div className="mt-8 rounded-3xl border border-white/10 bg-zinc-950 p-4">
       <p className="mb-3 text-sm font-medium text-zinc-400">Choice buttons</p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-12">
-        {pitchButtonChoices.map((note) => {
-          const correctChoice = answered && note === answer;
-          const wrongChoice = answered && selected === note && note !== answer;
-          const selectedChoice = selected === note;
+      <div className="space-y-3">
+        <div className="grid grid-cols-12 gap-3">
+          {pitchButtonChoices.map((note) => {
+            const correctChoice =
+              answered && isEnharmonicPitchMatch(note, answer, allowEnharmonics);
+            const wrongChoice =
+              answered &&
+              selected === note &&
+              !isEnharmonicPitchMatch(note, answer, allowEnharmonics);
+            const selectedChoice = selected === note;
 
-          return (
-            <button
-              key={note}
-              onClick={() => onSelect(note)}
-              disabled={answered}
-              className={`rounded-2xl border px-4 py-4 text-center text-lg font-semibold transition disabled:cursor-not-allowed ${
-                correctChoice
-                  ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
-                  : wrongChoice
-                    ? "border-red-400/70 bg-red-500/15 text-red-100"
-                    : selectedChoice
-                      ? "border-violet-400/70 bg-violet-500/15 text-white"
-                      : "border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"
-              }`}
-            >
-              {note}
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={note}
+                onClick={() => onSelect(note)}
+                disabled={answered}
+                className={`w-full rounded-2xl border px-4 py-4 text-center text-lg font-semibold transition disabled:cursor-not-allowed ${
+                  correctChoice
+                    ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
+                    : wrongChoice
+                      ? "border-red-400/70 bg-red-500/15 text-red-100"
+                      : selectedChoice
+                        ? "border-violet-400/70 bg-violet-500/15 text-white"
+                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"
+                }`}
+              >
+                {note}
+              </button>
+            );
+          })}
+        </div>
+        <div className="grid grid-cols-12 gap-3 border-t border-white/10 pt-3">
+          {enharmonicFlatChoices.map(({ note, slot }) => {
+            const correctChoice =
+              answered && isEnharmonicPitchMatch(note, answer, allowEnharmonics);
+            const wrongChoice =
+              answered &&
+              selected === note &&
+              !isEnharmonicPitchMatch(note, answer, allowEnharmonics);
+            const selectedChoice = selected === note;
+
+            return (
+              <button
+                key={note}
+                style={{ gridColumnStart: slot + 1 }}
+                onClick={() => onSelect(note)}
+                disabled={answered}
+                className={`w-full rounded-2xl border px-4 py-4 text-center text-lg font-semibold transition disabled:cursor-not-allowed ${
+                  correctChoice
+                    ? "border-emerald-400/70 bg-emerald-500/15 text-emerald-100"
+                    : wrongChoice
+                      ? "border-red-400/70 bg-red-500/15 text-red-100"
+                      : selectedChoice
+                        ? "border-violet-400/70 bg-violet-500/15 text-white"
+                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"
+                }`}
+              >
+                {note}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -316,7 +405,10 @@ function RangeKeyboard({
                     width: `${whiteKeyWidth * 0.64}%`,
                   }}
                 >
-                  {note}
+                  <span className="leading-tight">
+                    {blackKeyLabels[pitchClass] ?? pitchClass}
+                    <span className="block text-[8px] opacity-70">{octave}</span>
+                  </span>
                 </button>
               );
             })}
@@ -397,7 +489,14 @@ export default function TheoryTester() {
   const intervalSelection = makeIntervalAnswer(intervalQuality, intervalNumber);
   const currentAnswer = getCurrentAnswer();
   const expectedAnswer = getExpectedAnswer();
-  const isCorrect = currentAnswer === expectedAnswer;
+  const isCorrect =
+    mode === "pitch"
+      ? isEnharmonicPitchMatch(
+          currentAnswer,
+          expectedAnswer,
+          settings.pitch.allowEnharmonics,
+        )
+      : currentAnswer === expectedAnswer;
 
   const accuracy = useMemo(() => {
     if (totalCount === 0) return 0;
@@ -481,12 +580,30 @@ export default function TheoryTester() {
     setPerModeStats((current) => ({
       ...current,
       [mode]: {
-        correct: current[mode].correct + (submitted === expected ? 1 : 0),
+        correct:
+          current[mode].correct +
+          ((mode === "pitch"
+            ? isEnharmonicPitchMatch(
+                submitted,
+                expected,
+                settings.pitch.allowEnharmonics,
+              )
+            : submitted === expected)
+            ? 1
+            : 0),
         total: current[mode].total + 1,
       },
     }));
 
-    if (submitted === expected) {
+    if (
+      mode === "pitch"
+        ? isEnharmonicPitchMatch(
+            submitted,
+            expected,
+            settings.pitch.allowEnharmonics,
+          )
+        : submitted === expected
+    ) {
       setCorrectCount((current) => current + 1);
     }
   }
@@ -647,23 +764,38 @@ export default function TheoryTester() {
               </div>
 
               {mode === "pitch" && (
-                <label className="block text-sm text-zinc-300">
-                  Answer format
-                  <select
-                    value={settings.pitch.answerMode}
-                    onChange={(event) =>
-                      updateSettings((current) => {
-                        current.pitch.answerMode = event.target
-                          .value as TheorySettings["pitch"]["answerMode"];
-                        return current;
-                      })
-                    }
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
-                  >
-                    <option value="choices">Choice buttons</option>
-                    <option value="keyboard">Keyboard</option>
-                  </select>
-                </label>
+                <div className="space-y-3">
+                  <label className="block text-sm text-zinc-300">
+                    Answer format
+                    <select
+                      value={settings.pitch.answerMode}
+                      onChange={(event) =>
+                        updateSettings((current) => {
+                          current.pitch.answerMode = event.target
+                            .value as TheorySettings["pitch"]["answerMode"];
+                          return current;
+                        })
+                      }
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-3 py-2 text-white"
+                    >
+                      <option value="choices">Choice buttons</option>
+                      <option value="keyboard">Keyboard</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-3 rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
+                    <input
+                      type="checkbox"
+                      checked={settings.pitch.allowEnharmonics}
+                      onChange={(event) =>
+                        updateSettings((current) => {
+                          current.pitch.allowEnharmonics = event.target.checked;
+                          return current;
+                        })
+                      }
+                    />
+                    Allow enharmonics
+                  </label>
+                </div>
               )}
 
               {mode === "interval" && (
@@ -1078,6 +1210,7 @@ export default function TheoryTester() {
             selected={selected}
             answered={answered}
             answer={question.answer}
+            allowEnharmonics={settings.pitch.allowEnharmonics}
             onSelect={submitAnswer}
           />
         ) : mode === "pitch" && settings.pitch.answerMode === "keyboard" ? (

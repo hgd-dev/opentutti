@@ -82,17 +82,6 @@ export default function SiteHeader() {
               {item.label}
             </Link>
           ))}
-
-          {profile?.role === "teacher" && (
-            <>
-              <Link href="/teacher/classes" className="hover:text-white">
-                Classes
-              </Link>
-              <Link href="/teacher/assignments" className="hover:text-white">
-                Assignments
-              </Link>
-            </>
-          )}
         </nav>
 
         <div className="flex items-center gap-3">

@@ -132,6 +132,53 @@ function getModeLabel(mode: string) {
   return labels[mode] ?? mode;
 }
 
+const enharmonicPitchClassMap: Record<string, string> = {
+  Db: "C#",
+  Eb: "D#",
+  Gb: "F#",
+  Ab: "G#",
+  Bb: "A#",
+};
+
+const enharmonicFlatChoices = ["Db", "Eb", "Gb", "Ab", "Bb"];
+
+function normalizePitchClassForEnharmonic(note: string) {
+  return enharmonicPitchClassMap[note] ?? note;
+}
+
+function assignmentAllowsPitchEnharmonics(
+  assignment: Assignment | null,
+  question: AssignmentQuestion | undefined,
+) {
+  if (!assignment || !question?.question || question.question.mode !== "pitch") return false;
+  if (question.kind === "ear_training") return true;
+
+  const settings = assignment.settings_json as Partial<TheorySettings> | null;
+  return Boolean(settings?.pitch?.allowEnharmonics);
+}
+
+function isPitchEnharmonicMatch(
+  selectedNote: string | null | undefined,
+  answerNote: string,
+  allowEnharmonics: boolean,
+) {
+  if (!selectedNote) return false;
+  if (selectedNote === answerNote) return true;
+  if (!allowEnharmonics) return false;
+
+  const selectedOctave = selectedNote.match(/\d+$/)?.[0] ?? "";
+  const answerOctave = answerNote.match(/\d+$/)?.[0] ?? "";
+
+  if (selectedOctave || answerOctave) {
+    if (selectedOctave !== answerOctave) return false;
+  }
+
+  return (
+    normalizePitchClassForEnharmonic(selectedNote.replace(/\d+$/, "")) ===
+    normalizePitchClassForEnharmonic(answerNote.replace(/\d+$/, ""))
+  );
+}
+
 export default function AssignmentRunner({
   assignmentId,
 }: {
@@ -158,7 +205,14 @@ export default function AssignmentRunner({
   const currentQuestion = questions[currentIndex];
   const rawQuestion = currentQuestion?.question;
   const expectedAnswer = getExpectedAnswer();
-  const isCorrect = selected === expectedAnswer;
+  const isCorrect =
+    rawQuestion?.mode === "pitch"
+      ? isPitchEnharmonicMatch(
+          selected,
+          expectedAnswer,
+          assignmentAllowsPitchEnharmonics(assignment, currentQuestion),
+        )
+      : selected === expectedAnswer;
 
   const correctCount = useMemo(
     () => answerRecords.filter((record) => record.correct).length,
@@ -190,6 +244,48 @@ export default function AssignmentRunner({
     if (!assignment || assignment.question_count === 0) return 0;
     return Math.round((correctCount / assignment.question_count) * 100);
   }, [assignment, correctCount]);
+
+
+  async function markAttemptStarted(assignmentData: Assignment, studentId: string) {
+    const { data: existing } = await supabase
+      .from("attempts")
+      .select("*")
+      .eq("assignment_id", assignmentData.id)
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    if (existing) {
+      setExistingAttempt(existing as Attempt);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("attempts")
+      .upsert(
+        {
+          assignment_id: assignmentData.id,
+          student_id: studentId,
+          score: 0,
+          correct_count: 0,
+          total_questions: assignmentData.question_count,
+          details_json: {
+            assignment_type: assignmentData.assignment_type,
+            mode: assignmentData.mode,
+            answers: [],
+            started: true,
+          },
+          status: "in_progress",
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          completed_at: null,
+        },
+        { onConflict: "assignment_id,student_id" },
+      )
+      .select("*")
+      .maybeSingle();
+
+    if (!error && data) setExistingAttempt(data as Attempt);
+  }
 
   async function loadAssignment() {
     setLoading(true);
@@ -231,20 +327,7 @@ export default function AssignmentRunner({
     setAssignment(assignmentData);
     setQuestions(generateAssignmentQuestions(assignmentData));
 
-    const { data: attemptData, error: attemptError } = await supabase
-      .from("attempts")
-      .select("*")
-      .eq("assignment_id", assignmentId)
-      .eq("student_id", authData.user.id)
-      .maybeSingle();
-
-    if (attemptError) {
-      setMessage(attemptError.message);
-      setLoading(false);
-      return;
-    }
-
-    setExistingAttempt(attemptData);
+    await markAttemptStarted(assignmentData, authData.user.id);
     setLoading(false);
   }
 
@@ -260,7 +343,14 @@ export default function AssignmentRunner({
         prompt: rawQuestion.prompt,
         selected: choice,
         answer: getExpectedAnswer(),
-        correct: choice === rawQuestion.answer,
+        correct:
+          rawQuestion.mode === "pitch"
+            ? isPitchEnharmonicMatch(
+                choice,
+                getExpectedAnswer(),
+                assignmentAllowsPitchEnharmonics(assignment, currentQuestion),
+              )
+            : choice === getExpectedAnswer(),
       },
     ]);
   }
@@ -290,6 +380,8 @@ export default function AssignmentRunner({
           assignment_type: assignment.assignment_type,
           mode: assignment.mode,
         },
+        status: "completed",
+        updated_at: new Date().toISOString(),
         completed_at: new Date().toISOString(),
       },
       {
@@ -440,7 +532,7 @@ export default function AssignmentRunner({
           Question {currentIndex + 1} of {assignment.question_count}
         </p>
 
-        {existingAttempt && (
+        {existingAttempt && (existingAttempt.status === "completed" || existingAttempt.completed_at) && (
           <div className="mt-5 rounded-2xl border border-emerald-400/40 bg-emerald-500/10 p-4 text-sm leading-6 text-emerald-100">
             You previously completed this assignment with{" "}
             {existingAttempt.correct_count}/{existingAttempt.total_questions} (
@@ -528,12 +620,22 @@ export default function AssignmentRunner({
         )}
 
         <div className="mt-8 grid gap-3 sm:grid-cols-2">
-          {rawQuestion.choices.map((choice) => {
+          {(rawQuestion.mode === "pitch" && rawQuestion.choices.every((choice) => !/\d/.test(choice))
+            ? [...rawQuestion.choices, ...enharmonicFlatChoices]
+            : rawQuestion.choices
+          ).map((choice) => {
             const submittedChoice = requiresChordInversion()
               ? formatChordAnswer(choice, chordInversionAnswer)
               : choice;
             const chosen = selected === submittedChoice || selected === choice;
-            const correctChoice = answered && choice === rawQuestion.answer;
+            const correctChoice =
+              answered && rawQuestion.mode === "pitch"
+                ? isPitchEnharmonicMatch(
+                    choice,
+                    getExpectedAnswer(),
+                    assignmentAllowsPitchEnharmonics(assignment, currentQuestion),
+                  )
+                : answered && submittedChoice === getExpectedAnswer();
             const wrongChoice = answered && chosen && !correctChoice;
 
             return (
