@@ -518,14 +518,37 @@ export default function StaffDisplay({ template, compact = false }: StaffDisplay
     const rawMeasures = groupByMeasure(template.notes, template.timeSignature, template.settings?.measures ?? 1);
     const clef = template.clef || "treble";
     const parentWidth = container.parentElement?.clientWidth ?? 960;
-    const width = Math.max(720, Math.min(1800, parentWidth - 24));
     const leftPadding = compact ? 18 : 18;
-    const rightPadding = 36;
-    const usableWidth = width - leftPadding - rightPadding;
+    const rightPadding = compact ? 42 : 36;
     const prepared = prepareMeasures(rawMeasures, template.timeSignature);
-    const systems = makeSystems(prepared, usableWidth);
-    const systemHeight = compact ? 82 : 136;
-    const height = Math.max(compact ? 92 : 156, systems.length * systemHeight + (compact ? 2 : 20));
+
+    const compactFirstMeasureWidth = 560;
+    const compactMeasureWidth = 430;
+    const compactNaturalWidth =
+      leftPadding +
+      rightPadding +
+      prepared.reduce((sum, measure, index) => {
+        const floorWidth = index === 0 ? compactFirstMeasureWidth : compactMeasureWidth;
+        return sum + Math.max(floorWidth, measureComplexity(measure.renderNotes, index === 0));
+      }, 0);
+
+    const width = compact
+      ? Math.max(parentWidth - 24, compactNaturalWidth)
+      : Math.max(720, Math.min(1800, parentWidth - 24));
+    const usableWidth = width - leftPadding - rightPadding;
+    const systems = compact
+      ? [
+          prepared.map((measure, index) => ({
+            ...measure,
+            width: Math.max(
+              index === 0 ? compactFirstMeasureWidth : compactMeasureWidth,
+              measureComplexity(measure.renderNotes, index === 0),
+            ),
+          })),
+        ]
+      : makeSystems(prepared, usableWidth);
+    const systemHeight = compact ? 122 : 136;
+    const height = Math.max(compact ? 128 : 156, systems.length * systemHeight + (compact ? 8 : 20));
 
     const renderer = new Renderer(container, Renderer.Backends.SVG);
     renderer.resize(width, height);
@@ -533,7 +556,7 @@ export default function StaffDisplay({ template, compact = false }: StaffDisplay
     const context = renderer.getContext();
 
     systems.forEach((systemMeasures, systemIndex) => {
-      const y = (compact ? 10 : 38) + systemIndex * systemHeight;
+      const y = (compact ? 42 : 38) + systemIndex * systemHeight;
       let x = leftPadding;
 
       systemMeasures.forEach((measure, measureIndex) => {
@@ -561,7 +584,7 @@ export default function StaffDisplay({ template, compact = false }: StaffDisplay
         stave.setContext(context).draw();
 
         context.setFont("Arial", 9, "");
-        context.fillText(String(measure.measureNumber), x + 4, y + (compact ? 18 : 24));
+        context.fillText(String(measure.measureNumber), x + 6, y + (compact ? -6 : 24));
 
         if (measure.renderNotes.length > 0) {
           const vexNotes = measure.renderNotes.map((note) => createStaveNote(note, clef));
@@ -608,10 +631,10 @@ export default function StaffDisplay({ template, compact = false }: StaffDisplay
         x += staveWidth;
       });
     });
-  }, [template]);
+  }, [template, compact]);
 
   return (
-    <div className={compact ? "bg-white px-2 py-0" : "rounded-3xl border border-white/10 bg-white p-4"}>
+    <div className={compact ? "inline-block bg-white px-2 py-0" : "rounded-3xl border border-white/10 bg-white p-4"}>
       <div ref={containerRef} className="w-full" />
     </div>
   );

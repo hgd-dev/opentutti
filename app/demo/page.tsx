@@ -7,7 +7,7 @@ export default function DemoPage() {
       </h1>
       <p className="mt-4 max-w-3xl leading-8 text-zinc-400">
         Watch a walkthrough of OpenTutti&apos;s classroom practice tools, teacher
-        and student workflows, sight-reading generator, and OTLab workspace.
+        and student workflows, sight-reading generator, and OpenTuttiLab workspace.
       </p>
 
       <div className="mt-10 overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl shadow-black/30">
@@ -20,13 +20,6 @@ export default function DemoPage() {
           <source src="/OpenTuttiDemoFinal.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
-      </div>
-
-      <div className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] p-5 text-sm leading-7 text-zinc-400">
-        <p>
-          The video is embedded directly from the project&apos;s public folder, so it
-          will be served at <span className="text-zinc-200">/OpenTuttiDemoFinal.mp4</span> after deployment.
-        </p>
       </div>
     </section>
   );
